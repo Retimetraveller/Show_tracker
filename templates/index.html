@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VFX Show Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <span class="logo-icon">&#127909;</span>
+                <h1>VFX Show Tracker</h1>
+            </div>
+            <div class="header-actions">
+                <a href="/artist_view" class="btn btn-secondary" target="_blank">&#128100; Artist View</a>
+                <button class="btn btn-primary" onclick="openAddShowModal()">+ Add Show</button>
+            </div>
+        </header>
+
+        <!-- Show Tabs -->
+        <div class="show-tabs-container" id="showTabs">
+            <div class="show-tabs" id="showTabsList"></div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content" id="mainContent">
+            <div class="no-show-selected" id="noShowSelected">
+                <div class="empty-state">
+                    <div class="empty-icon">&#127916;</div>
+                    <h2>No Show Selected</h2>
+                    <p>Add a show to get started, or select one from the tabs above.</p>
+                </div>
+            </div>
+
+            <div class="show-content" id="showContent" style="display:none;">
+                <!-- Inner Navigation -->
+                <nav class="inner-nav">
+                    <button class="nav-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">
+                        <span class="nav-icon">&#128202;</span> Dashboard
+                    </button>
+                    <button class="nav-btn" data-tab="sequences" onclick="switchTab('sequences')">
+                        <span class="nav-icon">&#127903;</span> Sequences
+                    </button>
+                    <button class="nav-btn" data-tab="shots" onclick="switchTab('shots')">
+                        <span class="nav-icon">&#127909;</span> Shots
+                    </button>
+                    <button class="nav-btn" data-tab="artists" onclick="switchTab('artists')">
+                        <span class="nav-icon">&#128104;&#8205;&#127912;</span> Artists
+                    </button>
+                    <button class="nav-btn" data-tab="reports" onclick="switchTab('reports')">
+                        <span class="nav-icon">&#128221;</span> Reports
+                    </button>
+                </nav>
+
+                <!-- Dashboard Tab -->
+                <div class="tab-panel active" id="panel-dashboard">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="statShots">0</div>
+                            <div class="stat-label">Total Shots</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="statSeqs">0</div>
+                            <div class="stat-label">Sequences</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="statArtists">0</div>
+                            <div class="stat-label">Artists</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="statCompletion">0%</div>
+                            <div class="stat-label">Completion</div>
+                        </div>
+                    </div>
+                    <div class="dashboard-charts">
+                        <div class="chart-card">
+                            <h3>Status Distribution</h3>
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                        <div class="chart-card">
+                            <h3>Recent Activity</h3>
+                            <div class="activity-list" id="activityList"></div>
+                        </div>
+                    </div>
+                    <div class="show-info-card">
+                        <h3>Show Info</h3>
+                        <div class="info-grid" id="showInfoGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Sequences Tab -->
+                <div class="tab-panel" id="panel-sequences">
+                    <div class="section-header">
+                        <h2>Sequences</h2>
+                        <button class="btn btn-primary" onclick="openAddSequenceModal()">+ Add Sequence</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="sequencesTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Shots</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Shots Tab -->
+                <div class="tab-panel" id="panel-shots">
+                    <div class="section-header">
+                        <h2>Shots</h2>
+                        <div class="shot-actions">
+                            <button class="btn btn-primary" onclick="openBulkShotModal()">+ Bulk Add</button>
+                            <button class="btn btn-secondary" onclick="openAddShotModal()">+ Add Single</button>
+                        </div>
+                    </div>
+                    <div class="filters-bar">
+                        <input type="text" class="filter-input" id="shotSearch" placeholder="Search shots..." oninput="filterShots()">
+                        <select class="filter-select" id="filterStatus" onchange="filterShots()">
+                            <option value="">All Statuses</option>
+                            <option>Not Started</option>
+                            <option>WIP</option>
+                            <option>Review</option>
+                            <option>Approved</option>
+                            <option>On Hold</option>
+                            <option>Omit</option>
+                        </select>
+                        <select class="filter-select" id="filterPriority" onchange="filterShots()">
+                            <option value="">All Priorities</option>
+                            <option>Low</option>
+                            <option>Normal</option>
+                            <option>High</option>
+                            <option>Critical</option>
+                        </select>
+                        <select class="filter-select" id="filterArtist" onchange="filterShots()">
+                            <option value="">All Artists</option>
+                        </select>
+                        <select class="filter-select" id="filterSequence" onchange="filterShots()">
+                            <option value="">All Sequences</option>
+                        </select>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="shotsTable">
+                            <thead>
+                                <tr>
+                                    <th>Shot Name</th>
+                                    <th>Sequence</th>
+                                    <th>Type</th>
+                                    <th>Frames</th>
+                                    <th>Duration</th>
+                                    <th>Status</th>
+                                    <th>Priority</th>
+                                    <th>Assigned To</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Artists Tab -->
+                <div class="tab-panel" id="panel-artists">
+                    <div class="section-header">
+                        <h2>Artists</h2>
+                        <button class="btn btn-primary" onclick="openAddArtistModal()">+ Add Artist</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="artistsTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Department</th>
+                                    <th>Role</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Rate</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Reports Tab -->
+                <div class="tab-panel" id="panel-reports">
+                    <div class="section-header">
+                        <h2>Reports & Export</h2>
+                    </div>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Export Shots</h3>
+                            <p>Download all shots for this show as CSV.</p>
+                            <button class="btn btn-primary" onclick="exportShots()">Download CSV</button>
+                        </div>
+                        <div class="report-card">
+                            <h3>Export Artists</h3>
+                            <p>Download all artists for this show as CSV.</p>
+                            <button class="btn btn-primary" onclick="exportArtists()">Download CSV</button>
+                        </div>
+                        <div class="report-card">
+                            <h3>Show Info</h3>
+                            <p>View and edit show details.</p>
+                            <button class="btn btn-secondary" onclick="openEditShowModal()">Edit Show</button>
+                        </div>
+                    </div>
+                    <div class="history-section">
+                        <h3>Activity History</h3>
+                        <div class="activity-list-full" id="historyList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- Add/Edit Show Modal -->
+    <div class="modal-overlay" id="showModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="showModalTitle">Add Show</h2>
+                <button class="modal-close" onclick="closeModal('showModal')">&times;</button>
+            </div>
+            <div class="modal-body modal-scrollable">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Show Name *</label>
+                        <input type="text" id="showName" placeholder="Enter show name">
+                    </div>
+                    <div class="form-group">
+                        <label>Client</label>
+                        <input type="text" id="showClient" placeholder="Client name">
+                    </div>
+                    <div class="form-group">
+                        <label>Producer</label>
+                        <input type="text" id="showProducer" placeholder="Producer name">
+                    </div>
+                    <div class="form-group">
+                        <label>VFX Supervisor</label>
+                        <input type="text" id="showVfxSup" placeholder="VFX Supervisor">
+                    </div>
+                    <div class="form-group">
+                        <label>Comp Supervisor</label>
+                        <input type="text" id="showCompSup" placeholder="Comp Supervisor">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="showStatus">
+                            <option value="Active">Active</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Complete">Complete</option>
+                            <option value="On Hold">On Hold</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" id="showStartDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Delivery Date</label>
+                        <input type="date" id="showDeliveryDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Budget</label>
+                        <input type="text" id="showBudget" placeholder="Budget">
+                    </div>
+                    <div class="form-group">
+                        <label>FPS</label>
+                        <input type="text" id="showFps" value="24">
+                    </div>
+                    <div class="form-group">
+                        <label>Resolution</label>
+                        <input type="text" id="showResolution" value="1920x1080">
+                    </div>
+                    <div class="form-group">
+                        <label>Colorspace</label>
+                        <input type="text" id="showColorspace" value="ACES">
+                    </div>
+                </div>
+                <div class="form-group full-width">
+                    <label>Notes</label>
+                    <textarea id="showNotes" rows="3" placeholder="Notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('showModal')">Cancel</button>
+                <button class="btn btn-primary" id="showSaveBtn" onclick="saveShow()">Save Show</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Sequence Modal -->
+    <div class="modal-overlay" id="sequenceModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="seqModalTitle">Add Sequence</h2>
+                <button class="modal-close" onclick="closeModal('sequenceModal')">&times;</button>
+            </div>
+            <div class="modal-body modal-scrollable">
+                <div class="form-group">
+                    <label>Sequence Name *</label>
+                    <input type="text" id="seqName" placeholder="e.g., seq_01">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="seqDescription" rows="3" placeholder="Description..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('sequenceModal')">Cancel</button>
+                <button class="btn btn-primary" id="seqSaveBtn" onclick="saveSequence()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Shot Modal -->
+    <div class="modal-overlay" id="shotModal">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h2 id="shotModalTitle">Add Shot</h2>
+                <button class="modal-close" onclick="closeModal('shotModal')">&times;</button>
+            </div>
+            <div class="modal-body modal-scrollable">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Shot Name *</label>
+                        <input type="text" id="shotName" placeholder="e.g., Show_seq_01_sh_001">
+                    </div>
+                    <div class="form-group">
+                        <label>Sequence</label>
+                        <select id="shotSequence"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Shot Type</label>
+                        <select id="shotType">
+                            <option value="">Select Type</option>
+                            <option>VFX</option>
+                            <option>CG</option>
+                            <option>Cleanup</option>
+                            <option>Roto</option>
+                            <option>Matchmove</option>
+                            <option>Paint</option>
+                            <option>Compositing</option>
+                            <option>Full CG</option>
+                            <option>Element</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Frames</label>
+                        <input type="text" id="shotFrames" placeholder="e.g., 1001-1100">
+                    </div>
+                    <div class="form-group">
+                        <label>Duration</label>
+                        <input type="text" id="shotDuration" placeholder="e.g., 4s">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="shotStatus">
+                            <option>Not Started</option>
+                            <option>WIP</option>
+                            <option>Review</option>
+                            <option>Approved</option>
+                            <option>On Hold</option>
+                            <option>Omit</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Priority</label>
+                        <select id="shotPriority">
+                            <option>Low</option>
+                            <option selected>Normal</option>
+                            <option>High</option>
+                            <option>Critical</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Assigned To</label>
+                        <select id="shotAssigned"></select>
+                    </div>
+                </div>
+                <div class="form-group full-width">
+                    <label>Description</label>
+                    <textarea id="shotDescription" rows="2" placeholder="Description..."></textarea>
+                </div>
+                <div class="form-group full-width">
+                    <label>Notes</label>
+                    <textarea id="shotNotes" rows="2" placeholder="Notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('shotModal')">Cancel</button>
+                <button class="btn btn-primary" id="shotSaveBtn" onclick="saveShot()">Save Shot</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Add Shots Modal -->
+    <div class="modal-overlay" id="bulkShotModal">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h2>Bulk Add Shots</h2>
+                <button class="modal-close" onclick="closeModal('bulkShotModal')">&times;</button>
+            </div>
+            <div class="modal-body modal-scrollable">
+                <div class="info-box">
+                    <strong>How it works:</strong> Enter a shot name pattern like <code>Show_seq_01_sh_001</code> and specify how many shots to create. The last number will auto-increment.
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Shot Pattern *</label>
+                        <input type="text" id="bulkPattern" placeholder="e.g., Show_seq_01_sh_001" value="Show_seq_01_sh_001">
+                    </div>
+                    <div class="form-group">
+                        <label>Number of Shots *</label>
+                        <input type="number" id="bulkCount" placeholder="e.g., 100" min="1" max="9999" value="10">
+                    </div>
+                    <div class="form-group">
+                        <label>Sequence</label>
+                        <select id="bulkSequence"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Shot Type</label>
+                        <select id="bulkType">
+                            <option value="">Select Type</option>
+                            <option>VFX</option>
+                            <option>CG</option>
+                            <option>Cleanup</option>
+                            <option>Roto</option>
+                            <option>Matchmove</option>
+                            <option>Paint</option>
+                            <option>Compositing</option>
+                            <option>Full CG</option>
+                            <option>Element</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="bulkStatus">
+                            <option>Not Started</option>
+                            <option>WIP</option>
+                            <option>Review</option>
+                            <option>Approved</option>
+                            <option>On Hold</option>
+                            <option>Omit</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Priority</label>
+                        <select id="bulkPriority">
+                            <option>Low</option>
+                            <option selected>Normal</option>
+                            <option>High</option>
+                            <option>Critical</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Assigned To</label>
+                        <select id="bulkAssigned"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Frames</label>
+                        <input type="text" id="bulkFrames" placeholder="e.g., 1001-1100">
+                    </div>
+                    <div class="form-group">
+                        <label>Duration</label>
+                        <input type="text" id="bulkDuration" placeholder="e.g., 4s">
+                    </div>
+                </div>
+                <div class="form-group full-width">
+                    <label>Notes</label>
+                    <textarea id="bulkNotes" rows="2" placeholder="Notes..."></textarea>
+                </div>
+                <div class="preview-section">
+                    <h4>Preview</h4>
+                    <div class="preview-list" id="bulkPreview"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('bulkShotModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveBulkShots()">Create Shots</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Artist Modal -->
+    <div class="modal-overlay" id="artistModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="artistModalTitle">Add Artist</h2>
+                <button class="modal-close" onclick="closeModal('artistModal')">&times;</button>
+            </div>
+            <div class="modal-body modal-scrollable">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Artist Name *</label>
+                        <input type="text" id="artistName" placeholder="Full name">
+                    </div>
+                    <div class="form-group">
+                        <label>Department</label>
+                        <select id="artistDepartment">
+                            <option value="">Select Department</option>
+                            <option>Compositing</option>
+                            <option>Lighting</option>
+                            <option>FX</option>
+                            <option>Animation</option>
+                            <option>Roto</option>
+                            <option>Prep</option>
+                            <option>Matchmove</option>
+                            <option>Concept</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Role</label>
+                        <input type="text" id="artistRole" placeholder="e.g., Lead Compositor">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="artistEmail" placeholder="email@studio.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="text" id="artistPhone" placeholder="Phone number">
+                    </div>
+                    <div class="form-group">
+                        <label>Rate</label>
+                        <input type="text" id="artistRate" placeholder="e.g., $500/day">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('artistModal')">Cancel</button>
+                <button class="btn btn-primary" id="artistSaveBtn" onclick="saveArtist()">Save Artist</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ==================== STATE ====================
+    let shows = [];
+    let currentShowId = null;
+    let currentTab = 'dashboard';
+    let sequences = [];
+    let shots = [];
+    let artists = [];
+    let statusChart = null;
+    let editingId = null;
+    let editingType = null;
+
+    const STATUS_COLORS = {
+        "Not Started": "#6b7280",
+        "WIP": "#fbbf24",
+        "Review": "#60a5fa",
+        "Approved": "#4ade80",
+        "On Hold": "#f87171",
+        "Omit": "#888888"
+    };
+    const STATUS_BG_COLORS = {
+        "Not Started": "rgba(107, 114, 128, 0.15)",
+        "WIP": "rgba(251, 191, 36, 0.15)",
+        "Review": "rgba(96, 165, 250, 0.15)",
+        "Approved": "rgba(74, 222, 128, 0.15)",
+        "On Hold": "rgba(248, 113, 113, 0.15)",
+        "Omit": "rgba(136, 136, 136, 0.15)"
+    };
+
+    // ==================== INIT ====================
+    document.addEventListener('DOMContentLoaded', () => {
+        loadShows();
+        // Bulk preview update
+        document.getElementById('bulkPattern').addEventListener('input', updateBulkPreview);
+        document.getElementById('bulkCount').addEventListener('input', updateBulkPreview);
+    });
+
+    // ==================== SHOWS ====================
+    async function loadShows() {
+        const res = await fetch('/api/shows');
+        shows = await res.json();
+        renderShowTabs();
+        if (shows.length > 0 && !currentShowId) {
+            selectShow(shows[0].id);
+        }
+    }
+
+    function renderShowTabs() {
+        const list = document.getElementById('showTabsList');
+        list.innerHTML = '';
+        shows.forEach(show => {
+            const tab = document.createElement('div');
+            tab.className = 'show-tab' + (show.id === currentShowId ? ' active' : '');
+            tab.innerHTML = `<span>${show.name}</span><button class="tab-close" onclick="event.stopPropagation(); deleteShow(${show.id})">&times;</button>`;
+            tab.onclick = () => selectShow(show.id);
+            list.appendChild(tab);
+        });
+    }
+
+    async function selectShow(showId) {
+        currentShowId = showId;
+        renderShowTabs();
+        document.getElementById('noShowSelected').style.display = 'none';
+        document.getElementById('showContent').style.display = 'block';
+        await loadShowData();
+        refreshCurrentTab();
+    }
+
+    async function loadShowData() {
+        if (!currentShowId) return;
+        const [seqRes, shotRes, artRes] = await Promise.all([
+            fetch(`/api/shows/${currentShowId}/sequences`),
+            fetch(`/api/shows/${currentShowId}/shots`),
+            fetch(`/api/shows/${currentShowId}/artists`)
+        ]);
+        sequences = await seqRes.json();
+        shots = await shotRes.json();
+        artists = await artRes.json();
+    }
+
+    function refreshCurrentTab() {
+        if (currentTab === 'dashboard') loadDashboard();
+        else if (currentTab === 'sequences') loadSequences();
+        else if (currentTab === 'shots') loadShots();
+        else if (currentTab === 'artists') loadArtists();
+        else if (currentTab === 'reports') loadReports();
+    }
+
+    // ==================== TABS ====================
+    function switchTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+        document.getElementById(`panel-${tab}`).classList.add('active');
+        refreshCurrentTab();
+    }
+
+    // ==================== DASHBOARD ====================
+    async function loadDashboard() {
+        if (!currentShowId) return;
+        const res = await fetch(`/api/shows/${currentShowId}/stats`);
+        const stats = await res.json();
+        
+        document.getElementById('statShots').textContent = stats.shot_count;
+        document.getElementById('statSeqs').textContent = stats.seq_count;
+        document.getElementById('statArtists').textContent = stats.artist_count;
+        
+        const total = stats.shot_count;
+        const approved = stats.status_counts['Approved'] || 0;
+        const omit = stats.status_counts['Omit'] || 0;
+        const completion = total > 0 ? Math.round(((approved + omit) / total) * 100) : 0;
+        document.getElementById('statCompletion').textContent = completion + '%';
+
+        // Status chart
+        const ctx = document.getElementById('statusChart').getContext('2d');
+        if (statusChart) statusChart.destroy();
+        statusChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(stats.status_counts),
+                datasets: [{
+                    data: Object.values(stats.status_counts),
+                    backgroundColor: Object.keys(stats.status_counts).map(s => STATUS_COLORS[s] || '#6b7280'),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { color: '#f0f1f5' } } }
+            }
+        });
+
+        // Activity
+        const histRes = await fetch(`/api/shows/${currentShowId}/history`);
+        const history = await histRes.json();
+        const list = document.getElementById('activityList');
+        list.innerHTML = history.slice(0, 10).map(h => `
+            <div class="activity-item">
+                <span class="activity-dot"></span>
+                <span class="activity-text">${h.action}</span>
+                <span class="activity-time">${formatDate(h.timestamp)}</span>
+            </div>
+        `).join('');
+
+        // Show info
+        const showRes = await fetch(`/api/shows/${currentShowId}`);
+        const show = await showRes.json();
+        document.getElementById('showInfoGrid').innerHTML = `
+            <div class="info-item"><span class="info-label">Client:</span> ${show.client || '-'}</div>
+            <div class="info-item"><span class="info-label">Producer:</span> ${show.producer || '-'}</div>
+            <div class="info-item"><span class="info-label">VFX Sup:</span> ${show.vfx_supervisor || '-'}</div>
+            <div class="info-item"><span class="info-label">Comp Sup:</span> ${show.comp_supervisor || '-'}</div>
+            <div class="info-item"><span class="info-label">Start:</span> ${show.start_date || '-'}</div>
+            <div class="info-item"><span class="info-label">Delivery:</span> ${show.delivery_date || '-'}</div>
+            <div class="info-item"><span class="info-label">FPS:</span> ${show.fps || '-'}</div>
+            <div class="info-item"><span class="info-label">Resolution:</span> ${show.resolution || '-'}</div>
+            <div class="info-item"><span class="info-label">Colorspace:</span> ${show.colorspace || '-'}</div>
+            <div class="info-item"><span class="info-label">Budget:</span> ${show.budget || '-'}</div>
+            <div class="info-item"><span class="info-label">Status:</span> ${show.status || '-'}</div>
+            <div class="info-item full"><span class="info-label">Notes:</span> ${show.notes || '-'}</div>
+        `;
+    }
+
+    // ==================== SEQUENCES ====================
+    function loadSequences() {
+        const tbody = document.querySelector('#sequencesTable tbody');
+        tbody.innerHTML = sequences.map(seq => {
+            const shotCount = shots.filter(s => s.sequence_id === seq.id).length;
+            return `<tr>
+                <td>${seq.name}</td>
+                <td>${seq.description || ''}</td>
+                <td>${shotCount}</td>
+                <td>
+                    <button class="btn-icon" onclick="openEditSequenceModal(${seq.id})">&#9998;</button>
+                    <button class="btn-icon btn-danger" onclick="deleteSequence(${seq.id})">&#128465;</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ==================== SHOTS ====================
+    function loadShots() {
+        updateShotFilters();
+        filterShots();
+    }
+
+    function updateShotFilters() {
+        const artistSelect = document.getElementById('filterArtist');
+        const currentVal = artistSelect.value;
+        artistSelect.innerHTML = '<option value="">All Artists</option>';
+        artists.forEach(a => {
+            artistSelect.innerHTML += `<option value="${a.name}">${a.name}</option>`;
+        });
+        artistSelect.value = currentVal;
+
+        const seqSelect = document.getElementById('filterSequence');
+        const seqVal = seqSelect.value;
+        seqSelect.innerHTML = '<option value="">All Sequences</option>';
+        sequences.forEach(s => {
+            seqSelect.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+        });
+        seqSelect.value = seqVal;
+    }
+
+    function filterShots() {
+        const search = document.getElementById('shotSearch').value.toLowerCase();
+        const status = document.getElementById('filterStatus').value;
+        const priority = document.getElementById('filterPriority').value;
+        const artist = document.getElementById('filterArtist').value;
+        const seq = document.getElementById('filterSequence').value;
+
+        const filtered = shots.filter(s => {
+            return (!search || s.name.toLowerCase().includes(search)) &&
+                   (!status || s.status === status) &&
+                   (!priority || s.priority === priority) &&
+                   (!artist || s.assigned_to === artist) &&
+                   (!seq || String(s.sequence_id) === seq);
+        });
+
+        const tbody = document.querySelector('#shotsTable tbody');
+        tbody.innerHTML = filtered.map(shot => {
+            const seq = sequences.find(s => s.id === shot.sequence_id);
+            const statusColor = STATUS_BG_COLORS[shot.status] || STATUS_BG_COLORS['Not Started'];
+            const statusTextColor = STATUS_COLORS[shot.status] || STATUS_COLORS['Not Started'];
+            return `<tr>
+                <td><strong>${shot.name}</strong></td>
+                <td>${seq ? seq.name : '-'}</td>
+                <td>${shot.shot_type || '-'}</td>
+                <td>${shot.frames || '-'}</td>
+                <td>${shot.duration || '-'}</td>
+                <td>
+                    <select class="status-dropdown" style="background:${statusColor};color:${statusTextColor};border-color:${statusTextColor}" 
+                            onchange="updateShotStatus(${shot.id}, this.value)">
+                        <option value="Not Started" ${shot.status==='Not Started'?'selected':''}>Not Started</option>
+                        <option value="WIP" ${shot.status==='WIP'?'selected':''}>WIP</option>
+                        <option value="Review" ${shot.status==='Review'?'selected':''}>Review</option>
+                        <option value="Approved" ${shot.status==='Approved'?'selected':''}>Approved</option>
+                        <option value="On Hold" ${shot.status==='On Hold'?'selected':''}>On Hold</option>
+                        <option value="Omit" ${shot.status==='Omit'?'selected':''}>Omit</option>
+                    </select>
+                </td>
+                <td><span class="priority-badge priority-${shot.priority.toLowerCase()}">${shot.priority}</span></td>
+                <td>${shot.assigned_to || '-'}</td>
+                <td>
+                    <button class="btn-icon" onclick="openEditShotModal(${shot.id})">&#9998;</button>
+                    <button class="btn-icon btn-danger" onclick="deleteShot(${shot.id})">&#128465;</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    async function updateShotStatus(shotId, status) {
+        await fetch(`/api/shots/${shotId}/status`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({status})
+        });
+        const shot = shots.find(s => s.id === shotId);
+        if (shot) shot.status = status;
+        filterShots();
+    }
+
+    // ==================== ARTISTS ====================
+    function loadArtists() {
+        const tbody = document.querySelector('#artistsTable tbody');
+        tbody.innerHTML = artists.map(a => `<tr>
+            <td><strong>${a.name}</strong></td>
+            <td>${a.department || '-'}</td>
+            <td>${a.role || '-'}</td>
+            <td>${a.email || '-'}</td>
+            <td>${a.phone || '-'}</td>
+            <td>${a.rate || '-'}</td>
+            <td>
+                <button class="btn-icon" onclick="openEditArtistModal(${a.id})">&#9998;</button>
+                <button class="btn-icon btn-danger" onclick="deleteArtist(${a.id})">&#128465;</button>
+            </td>
+        </tr>`).join('');
+    }
+
+    // ==================== REPORTS ====================
+    async function loadReports() {
+        const histRes = await fetch(`/api/shows/${currentShowId}/history`);
+        const history = await histRes.json();
+        document.getElementById('historyList').innerHTML = history.map(h => `
+            <div class="activity-item">
+                <span class="activity-dot"></span>
+                <span class="activity-text">${h.action}</span>
+                <span class="activity-time">${formatDate(h.timestamp)}</span>
+            </div>
+        `).join('');
+    }
+
+    // ==================== MODALS ====================
+    function openModal(id) {
+        document.getElementById(id).classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // Show Modal
+    function openAddShowModal() {
+        editingId = null;
+        editingType = 'show';
+        document.getElementById('showModalTitle').textContent = 'Add Show';
+        document.getElementById('showName').value = '';
+        document.getElementById('showClient').value = '';
+        document.getElementById('showProducer').value = '';
+        document.getElementById('showVfxSup').value = '';
+        document.getElementById('showCompSup').value = '';
+        document.getElementById('showStatus').value = 'Active';
+        document.getElementById('showStartDate').value = '';
+        document.getElementById('showDeliveryDate').value = '';
+        document.getElementById('showBudget').value = '';
+        document.getElementById('showFps').value = '24';
+        document.getElementById('showResolution').value = '1920x1080';
+        document.getElementById('showColorspace').value = 'ACES';
+        document.getElementById('showNotes').value = '';
+        openModal('showModal');
+    }
+    async function openEditShowModal() {
+        const res = await fetch(`/api/shows/${currentShowId}`);
+        const show = await res.json();
+        editingId = currentShowId;
+        editingType = 'show';
+        document.getElementById('showModalTitle').textContent = 'Edit Show';
+        document.getElementById('showName').value = show.name;
+        document.getElementById('showClient').value = show.client || '';
+        document.getElementById('showProducer').value = show.producer || '';
+        document.getElementById('showVfxSup').value = show.vfx_supervisor || '';
+        document.getElementById('showCompSup').value = show.comp_supervisor || '';
+        document.getElementById('showStatus').value = show.status || 'Active';
+        document.getElementById('showStartDate').value = show.start_date || '';
+        document.getElementById('showDeliveryDate').value = show.delivery_date || '';
+        document.getElementById('showBudget').value = show.budget || '';
+        document.getElementById('showFps').value = show.fps || '24';
+        document.getElementById('showResolution').value = show.resolution || '1920x1080';
+        document.getElementById('showColorspace').value = show.colorspace || 'ACES';
+        document.getElementById('showNotes').value = show.notes || '';
+        openModal('showModal');
+    }
+    async function saveShow() {
+        const data = {
+            name: document.getElementById('showName').value,
+            client: document.getElementById('showClient').value,
+            producer: document.getElementById('showProducer').value,
+            vfx_supervisor: document.getElementById('showVfxSup').value,
+            comp_supervisor: document.getElementById('showCompSup').value,
+            status: document.getElementById('showStatus').value,
+            start_date: document.getElementById('showStartDate').value,
+            delivery_date: document.getElementById('showDeliveryDate').value,
+            budget: document.getElementById('showBudget').value,
+            fps: document.getElementById('showFps').value,
+            resolution: document.getElementById('showResolution').value,
+            colorspace: document.getElementById('showColorspace').value,
+            notes: document.getElementById('showNotes').value
+        };
+        if (!data.name) { alert('Show name is required'); return; }
+        
+        const url = editingId ? `/api/shows/${editingId}` : '/api/shows';
+        const method = editingId ? 'PUT' : 'POST';
+        await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+        closeModal('showModal');
+        await loadShows();
+        if (editingId) selectShow(editingId);
+    }
+    async function deleteShow(id) {
+        if (!confirm('Delete this show and all its data?')) return;
+        await fetch(`/api/shows/${id}`, {method: 'DELETE'});
+        currentShowId = null;
+        await loadShows();
+        if (shows.length === 0) {
+            document.getElementById('noShowSelected').style.display = 'block';
+            document.getElementById('showContent').style.display = 'none';
+        }
+    }
+
+    // Sequence Modal
+    function openAddSequenceModal() {
+        editingId = null;
+        editingType = 'sequence';
+        document.getElementById('seqModalTitle').textContent = 'Add Sequence';
+        document.getElementById('seqName').value = '';
+        document.getElementById('seqDescription').value = '';
+        openModal('sequenceModal');
+    }
+    function openEditSequenceModal(id) {
+        const seq = sequences.find(s => s.id === id);
+        if (!seq) return;
+        editingId = id;
+        editingType = 'sequence';
+        document.getElementById('seqModalTitle').textContent = 'Edit Sequence';
+        document.getElementById('seqName').value = seq.name;
+        document.getElementById('seqDescription').value = seq.description || '';
+        openModal('sequenceModal');
+    }
+    async function saveSequence() {
+        const data = {name: document.getElementById('seqName').value, description: document.getElementById('seqDescription').value};
+        if (!data.name) { alert('Sequence name is required'); return; }
+        const url = editingId ? `/api/sequences/${editingId}` : `/api/shows/${currentShowId}/sequences`;
+        const method = editingId ? 'PUT' : 'POST';
+        await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+        closeModal('sequenceModal');
+        await loadShowData();
+        loadSequences();
+    }
+    async function deleteSequence(id) {
+        if (!confirm('Delete this sequence?')) return;
+        await fetch(`/api/sequences/${id}`, {method: 'DELETE'});
+        await loadShowData();
+        loadSequences();
+    }
+
+    // Shot Modal
+    function populateShotForm(selectId) {
+        const seqSel = document.getElementById(selectId === 'shot' ? 'shotSequence' : 'bulkSequence');
+        seqSel.innerHTML = '<option value="">Select Sequence</option>';
+        sequences.forEach(s => seqSel.innerHTML += `<option value="${s.id}">${s.name}</option>`);
+        
+        const artSel = document.getElementById(selectId === 'shot' ? 'shotAssigned' : 'bulkAssigned');
+        artSel.innerHTML = '<option value="">Unassigned</option>';
+        artists.forEach(a => artSel.innerHTML += `<option value="${a.name}">${a.name}</option>`);
+    }
+    function openAddShotModal() {
+        editingId = null;
+        editingType = 'shot';
+        document.getElementById('shotModalTitle').textContent = 'Add Shot';
+        document.getElementById('shotName').value = '';
+        document.getElementById('shotType').value = '';
+        document.getElementById('shotFrames').value = '';
+        document.getElementById('shotDuration').value = '';
+        document.getElementById('shotStatus').value = 'Not Started';
+        document.getElementById('shotPriority').value = 'Normal';
+        document.getElementById('shotDescription').value = '';
+        document.getElementById('shotNotes').value = '';
+        populateShotForm('shot');
+        openModal('shotModal');
+    }
+    function openEditShotModal(id) {
+        const shot = shots.find(s => s.id === id);
+        if (!shot) return;
+        editingId = id;
+        editingType = 'shot';
+        document.getElementById('shotModalTitle').textContent = 'Edit Shot';
+        document.getElementById('shotName').value = shot.name;
+        document.getElementById('shotFrames').value = shot.frames || '';
+        document.getElementById('shotDuration').value = shot.duration || '';
+        document.getElementById('shotStatus').value = shot.status;
+        document.getElementById('shotPriority').value = shot.priority;
+        document.getElementById('shotDescription').value = shot.description || '';
+        document.getElementById('shotNotes').value = shot.notes || '';
+        populateShotForm('shot');
+        document.getElementById('shotSequence').value = shot.sequence_id || '';
+        document.getElementById('shotType').value = shot.shot_type || '';
+        document.getElementById('shotAssigned').value = shot.assigned_to || '';
+        openModal('shotModal');
+    }
+    async function saveShot() {
+        const data = {
+            sequence_id: document.getElementById('shotSequence').value || null,
+            name: document.getElementById('shotName').value,
+            description: document.getElementById('shotDescription').value,
+            shot_type: document.getElementById('shotType').value,
+            frames: document.getElementById('shotFrames').value,
+            duration: document.getElementById('shotDuration').value,
+            status: document.getElementById('shotStatus').value,
+            priority: document.getElementById('shotPriority').value,
+            assigned_to: document.getElementById('shotAssigned').value,
+            notes: document.getElementById('shotNotes').value
+        };
+        if (!data.name) { alert('Shot name is required'); return; }
+        const url = editingId ? `/api/shots/${editingId}` : `/api/shows/${currentShowId}/shots`;
+        const method = editingId ? 'PUT' : 'POST';
+        await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+        closeModal('shotModal');
+        await loadShowData();
+        loadShots();
+    }
+    async function deleteShot(id) {
+        if (!confirm('Delete this shot?')) return;
+        await fetch(`/api/shots/${id}`, {method: 'DELETE'});
+        await loadShowData();
+        loadShots();
+    }
+
+    // Bulk Shot Modal
+    function openBulkShotModal() {
+        populateShotForm('bulk');
+        document.getElementById('bulkPattern').value = 'Show_seq_01_sh_001';
+        document.getElementById('bulkCount').value = '10';
+        document.getElementById('bulkType').value = '';
+        document.getElementById('bulkStatus').value = 'Not Started';
+        document.getElementById('bulkPriority').value = 'Normal';
+        document.getElementById('bulkFrames').value = '';
+        document.getElementById('bulkDuration').value = '';
+        document.getElementById('bulkNotes').value = '';
+        updateBulkPreview();
+        openModal('bulkShotModal');
+    }
+    function updateBulkPreview() {
+        const pattern = document.getElementById('bulkPattern').value;
+        const count = parseInt(document.getElementById('bulkCount').value) || 0;
+        const preview = document.getElementById('bulkPreview');
+        if (!pattern || count < 1) { preview.innerHTML = '<span class="preview-empty">Enter pattern and count to preview</span>'; return; }
+        
+        // Client-side preview (same logic as server)
+        const matches = [...pattern.matchAll(/(\d+)/g)];
+        if (!matches.length) { preview.innerHTML = '<span class="preview-empty">No number found in pattern</span>'; return; }
+        
+        const lastMatch = matches[matches.length - 1];
+        const numStr = lastMatch[1];
+        const numLen = numStr.length;
+        const startNum = parseInt(numStr);
+        const prefix = pattern.slice(0, lastMatch.index);
+        const suffix = pattern.slice(lastMatch.index + numStr.length);
+        
+        let html = '';
+        const limit = Math.min(count, 20);
+        for (let i = 0; i < limit; i++) {
+            const num = String(startNum + i).padStart(numLen, '0');
+            html += `<span class="preview-item">${prefix}${num}${suffix}</span>`;
+        }
+        if (count > 20) html += `<span class="preview-more">+ ${count - 20} more...</span>`;
+        preview.innerHTML = html;
+    }
+    async function saveBulkShots() {
+        const data = {
+            pattern: document.getElementById('bulkPattern').value,
+            count: parseInt(document.getElementById('bulkCount').value),
+            sequence_id: document.getElementById('bulkSequence').value || null,
+            shot_type: document.getElementById('bulkType').value,
+            status: document.getElementById('bulkStatus').value,
+            priority: document.getElementById('bulkPriority').value,
+            assigned_to: document.getElementById('bulkAssigned').value,
+            frames: document.getElementById('bulkFrames').value,
+            duration: document.getElementById('bulkDuration').value,
+            notes: document.getElementById('bulkNotes').value
+        };
+        if (!data.pattern || !data.count) { alert('Pattern and count are required'); return; }
+        const res = await fetch(`/api/shows/${currentShowId}/shots/bulk`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        alert(`Created ${result.created} shots successfully!`);
+        closeModal('bulkShotModal');
+        await loadShowData();
+        loadShots();
+    }
+
+    // Artist Modal
+    function openAddArtistModal() {
+        editingId = null;
+        editingType = 'artist';
+        document.getElementById('artistModalTitle').textContent = 'Add Artist';
+        document.getElementById('artistName').value = '';
+        document.getElementById('artistDepartment').value = '';
+        document.getElementById('artistRole').value = '';
+        document.getElementById('artistEmail').value = '';
+        document.getElementById('artistPhone').value = '';
+        document.getElementById('artistRate').value = '';
+        openModal('artistModal');
+    }
+    function openEditArtistModal(id) {
+        const artist = artists.find(a => a.id === id);
+        if (!artist) return;
+        editingId = id;
+        editingType = 'artist';
+        document.getElementById('artistModalTitle').textContent = 'Edit Artist';
+        document.getElementById('artistName').value = artist.name;
+        document.getElementById('artistDepartment').value = artist.department || '';
+        document.getElementById('artistRole').value = artist.role || '';
+        document.getElementById('artistEmail').value = artist.email || '';
+        document.getElementById('artistPhone').value = artist.phone || '';
+        document.getElementById('artistRate').value = artist.rate || '';
+        openModal('artistModal');
+    }
+    async function saveArtist() {
+        const data = {
+            name: document.getElementById('artistName').value,
+            department: document.getElementById('artistDepartment').value,
+            role: document.getElementById('artistRole').value,
+            email: document.getElementById('artistEmail').value,
+            phone: document.getElementById('artistPhone').value,
+            rate: document.getElementById('artistRate').value
+        };
+        if (!data.name) { alert('Artist name is required'); return; }
+        const url = editingId ? `/api/artists/${editingId}` : `/api/shows/${currentShowId}/artists`;
+        const method = editingId ? 'PUT' : 'POST';
+        await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+        closeModal('artistModal');
+        await loadShowData();
+        loadArtists();
+    }
+    async function deleteArtist(id) {
+        if (!confirm('Delete this artist?')) return;
+        await fetch(`/api/artists/${id}`, {method: 'DELETE'});
+        await loadShowData();
+        loadArtists();
+    }
+
+    // Export
+    function exportShots() {
+        window.location.href = `/api/shows/${currentShowId}/export/shots`;
+    }
+    function exportArtists() {
+        window.location.href = `/api/shows/${currentShowId}/export/artists`;
+    }
+
+    // Utilities
+    function formatDate(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        return d.toLocaleString();
+    }
+
+    // Close modals on Escape
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+            document.body.style.overflow = '';
+        }
+    });
+    // Close on backdrop click
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) {
+                overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+    });
+    </script>
+</body>
+</html>
