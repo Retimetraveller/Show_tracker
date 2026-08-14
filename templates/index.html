@@ -817,20 +817,18 @@
     }
 
     function toggleSequence(seqId) {
-        if (selectedSequences.has(seqId)) {
-            selectedSequences.delete(seqId);
+        // Convert to number if it's a sequence ID (not 'unassigned')
+        const key = seqId === 'unassigned' ? 'unassigned' : Number(seqId);
+        
+        if (selectedSequences.has(key)) {
+            selectedSequences.delete(key);
         } else {
-            selectedSequences.add(seqId);
+            selectedSequences.add(key);
         }
-        // If nothing selected, select all (optional)
-        if (selectedSequences.size === 0) {
-            sequences.forEach(s => selectedSequences.add(s.id));
-            if (shots.some(s => !s.sequence_id)) selectedSequences.add('unassigned');
-        }
+        
         renderSequenceFilter();
         renderShotsBySequence();
     }
-
     function selectAllSequences() {
         selectedSequences = new Set();
         sequences.forEach(s => selectedSequences.add(s.id));
@@ -853,12 +851,18 @@
         const priority = document.getElementById('filterPriority').value;
         const artist = document.getElementById('filterArtist').value;
         
+        // If no sequences selected, show message
+        if (selectedSequences.size === 0) {
+            container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text2);">Select at least one sequence to view shots.</div>`;
+            return;
+        }
+        
         // Filter shots based on all criteria
         let filteredShots = shots.filter(s => {
             return (!search || s.name.toLowerCase().includes(search)) &&
-                   (!status || s.status === status) &&
-                   (!priority || s.priority === priority) &&
-                   (!artist || s.assigned_to === artist);
+                (!status || s.status === status) &&
+                (!priority || s.priority === priority) &&
+                (!artist || s.assigned_to === artist);
         });
         
         // Group by sequence
@@ -880,8 +884,10 @@
         
         let html = '';
         for (const [seqId, group] of Object.entries(seqGroups)) {
+            // Convert seqId to number for comparison (except 'unassigned')
+            const key = seqId === 'unassigned' ? 'unassigned' : Number(seqId);
             // Skip if this sequence is not selected in filter
-            if (!selectedSequences.has(seqId)) continue;
+            if (!selectedSequences.has(key)) continue;
             if (group.shots.length === 0) continue;
             
             html += `<div class="sequence-group" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;">`;
