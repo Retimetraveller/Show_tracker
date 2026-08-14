@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playlists - VFX Show Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .playlist-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .playlist-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .playlist-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .playlist-card h3 {
+            color: var(--text);
+            margin: 0 0 8px 0;
+            font-size: 16px;
+        }
+        .playlist-card p {
+            color: var(--text2);
+            font-size: 13px;
+            margin: 0 0 12px 0;
+        }
+        .playlist-card .shot-count {
+            color: var(--text3);
+            font-size: 12px;
+        }
+        .playlist-detail {
+            display: none;
+            margin-top: 20px;
+        }
+        .playlist-detail.active {
+            display: block;
+        }
+        .shot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .shot-grid-item {
+            background: var(--elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            text-align: center;
+        }
+        .shot-grid-item .thumbnail {
+            width: 100%;
+            height: 120px;
+            background: var(--bg);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: var(--text3);
+        }
+        .shot-grid-item .name {
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .shot-grid-item .status {
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text2);
+        }
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .back-btn {
+            background: var(--elevated);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .back-btn:hover {
+            background: var(--border);
+        }
+        .playlist-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .playlist-actions button {
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .btn-sm-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+        .btn-sm-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+        .btn-sm-secondary {
+            background: var(--elevated);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .add-to-playlist-btn {
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text2);
+            cursor: pointer;
+        }
+        .add-to-playlist-btn:hover {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+        .playlist-selector {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 8px 0;
+        }
+        .playlist-selector button {
+            padding: 4px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text2);
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .playlist-selector button.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+        .playlist-selector button:hover {
+            background: var(--elevated);
+        }
+        .playlist-selector button.active:hover {
+            background: #3b82f6;
+        }
+        .main-content {
+            padding: 20px;
+            overflow-y: auto;
+            height: calc(100vh - 70px);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo">
+                <span class="logo-icon">&#127908;</span>
+                <h1>Playlists</h1>
+            </div>
+            <div class="header-actions">
+                <a href="/" class="btn btn-secondary">&#8592; Back to Tracker</a>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Show Selector -->
+            <div class="filters-bar" style="margin-bottom:16px;">
+                <label style="color:var(--text2);font-size:13px;">Select Show:</label>
+                <select id="showSelector" onchange="loadPlaylists()" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);padding:8px 12px;">
+                    <option value="">Loading...</option>
+                </select>
+                <button class="btn btn-primary" onclick="openCreatePlaylistModal()" style="margin-left:auto;">+ Create Playlist</button>
+            </div>
+
+            <!-- Playlist Grid -->
+            <div id="playlistGrid" class="playlist-grid"></div>
+
+            <!-- Playlist Detail View -->
+            <div id="playlistDetail" class="playlist-detail">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h2 id="detailTitle" style="color:var(--text);margin:0;"></h2>
+                    <button class="back-btn" onclick="closeDetail()">&#8592; Back to Playlists</button>
+                </div>
+                <p id="detailDescription" style="color:var(--text2);"></p>
+                <div id="detailShots" class="shot-grid"></div>
+                <div class="playlist-actions">
+                    <button class="btn-sm-primary" onclick="addShotsToPlaylist()">+ Add Shots</button>
+                    <button class="btn-sm-danger" onclick="deletePlaylist()">Delete Playlist</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Playlist Modal -->
+    <div class="modal-overlay" id="createPlaylistModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Create Playlist</h2>
+                <button class="modal-close" onclick="closeModal('createPlaylistModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Playlist Name *</label>
+                    <input type="text" id="playlistName" placeholder="e.g., Dailies - June 15" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="playlistDesc" rows="2" placeholder="What's this playlist for?" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Add Shots (optional)</label>
+                    <div id="playlistShotSelector" style="max-height:200px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;">
+                        <span style="color:var(--text3);font-size:13px;">Loading shots...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('createPlaylistModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="savePlaylist()">Create Playlist</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Shots to Playlist Modal -->
+    <div class="modal-overlay" id="addShotsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Add Shots to Playlist</h2>
+                <button class="modal-close" onclick="closeModal('addShotsModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="addShotsList" style="max-height:300px;overflow-y:auto;">
+                    <span style="color:var(--text3);">Loading shots...</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('addShotsModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveAddShots()">Add Selected</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentShowId = null;
+        let playlists = [];
+        let allShots = [];
+        let currentPlaylistId = null;
+        let selectedShotIds = new Set();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadShows();
+        });
+
+        async function loadShows() {
+            const res = await fetch('/api/shows');
+            const shows = await res.json();
+            const selector = document.getElementById('showSelector');
+            selector.innerHTML = '<option value="">Select a show</option>';
+            shows.forEach(s => {
+                selector.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+            });
+            if (shows.length > 0) {
+                selector.value = shows[0].id;
+                currentShowId = shows[0].id;
+                loadPlaylists();
+                loadAllShots();
+            }
+        }
+
+        async function loadPlaylists() {
+            if (!currentShowId) return;
+            const res = await fetch(`/api/shows/${currentShowId}/playlists`);
+            playlists = await res.json();
+            renderPlaylistGrid();
+        }
+
+        async function loadAllShots() {
+            if (!currentShowId) return;
+            const res = await fetch(`/api/shows/${currentShowId}/shots`);
+            allShots = await res.json();
+            // Update shot selector in modal
+            const container = document.getElementById('playlistShotSelector');
+            if (container) {
+                container.innerHTML = allShots.map(s => `
+                    <label style="display:block;padding:4px 0;cursor:pointer;color:var(--text);font-size:13px;">
+                        <input type="checkbox" value="${s.id}" class="shot-checkbox"> ${s.name}
+                    </label>
+                `).join('');
+            }
+        }
+
+        function renderPlaylistGrid() {
+            const grid = document.getElementById('playlistGrid');
+            if (playlists.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column:1/-1;">
+                        <div class="icon">&#127908;</div>
+                        <h3>No Playlists Yet</h3>
+                        <p>Create a playlist to group shots for review sessions.</p>
+                        <button class="btn btn-primary" onclick="openCreatePlaylistModal()">+ Create First Playlist</button>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = playlists.map(p => {
+                const shotCount = p.shot_ids ? p.shot_ids.length : 0;
+                return `
+                    <div class="playlist-card" onclick="openPlaylist(${p.id})">
+                        <h3>${p.name}</h3>
+                        <p>${p.description || 'No description'}</p>
+                        <span class="shot-count">${shotCount} shots</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function openPlaylist(id) {
+            currentPlaylistId = id;
+            const playlist = playlists.find(p => p.id === id);
+            if (!playlist) return;
+
+            document.getElementById('playlistGrid').style.display = 'none';
+            document.getElementById('playlistDetail').classList.add('active');
+            document.getElementById('detailTitle').textContent = playlist.name;
+            document.getElementById('detailDescription').textContent = playlist.description || 'No description';
+
+            const shotIds = playlist.shot_ids || [];
+            const shots = allShots.filter(s => shotIds.includes(s.id));
+
+            const container = document.getElementById('detailShots');
+            if (shots.length === 0) {
+                container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text2);grid-column:1/-1;">No shots in this playlist yet.</div>`;
+            } else {
+                container.innerHTML = shots.map(s => `
+                    <div class="shot-grid-item">
+                        <div class="thumbnail">&#128247;</div>
+                        <div class="name">${s.name}</div>
+                        <div class="status" style="color:${STATUS_COLORS[s.status] || '#6b7280'}">${s.status}</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function closeDetail() {
+            document.getElementById('playlistGrid').style.display = 'grid';
+            document.getElementById('playlistDetail').classList.remove('active');
+            currentPlaylistId = null;
+        }
+
+        function openCreatePlaylistModal() {
+            document.getElementById('playlistName').value = '';
+            document.getElementById('playlistDesc').value = '';
+            // Reset checkboxes
+            document.querySelectorAll('.shot-checkbox').forEach(cb => cb.checked = false);
+            openModal('createPlaylistModal');
+        }
+
+        async function savePlaylist() {
+            const name = document.getElementById('playlistName').value.trim();
+            const description = document.getElementById('playlistDesc').value.trim();
+            if (!name) { alert('Playlist name is required'); return; }
+
+            const selected = [];
+            document.querySelectorAll('.shot-checkbox:checked').forEach(cb => {
+                selected.push(parseInt(cb.value));
+            });
+
+            const res = await fetch(`/api/shows/${currentShowId}/playlists`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, description, shot_ids: selected})
+            });
+            const data = await res.json();
+            if (data.success) {
+                closeModal('createPlaylistModal');
+                loadPlaylists();
+            }
+        }
+
+        function addShotsToPlaylist() {
+            if (!currentPlaylistId) return;
+            // Show add shots modal
+            const container = document.getElementById('addShotsList');
+            const playlist = playlists.find(p => p.id === currentPlaylistId);
+            const existingIds = playlist?.shot_ids || [];
+            
+            container.innerHTML = allShots.map(s => {
+                const checked = existingIds.includes(s.id) ? 'checked' : '';
+                return `
+                    <label style="display:block;padding:4px 0;cursor:pointer;color:var(--text);font-size:13px;">
+                        <input type="checkbox" value="${s.id}" ${checked} class="add-shot-checkbox"> ${s.name}
+                    </label>
+                `;
+            }).join('');
+            openModal('addShotsModal');
+        }
+
+        async function saveAddShots() {
+            const selected = [];
+            document.querySelectorAll('.add-shot-checkbox:checked').forEach(cb => {
+                selected.push(parseInt(cb.value));
+            });
+
+            const playlist = playlists.find(p => p.id === currentPlaylistId);
+            if (!playlist) return;
+
+            await fetch(`/api/playlists/${currentPlaylistId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: playlist.name,
+                    description: playlist.description,
+                    shot_ids: selected
+                })
+            });
+            closeModal('addShotsModal');
+            await loadPlaylists();
+            openPlaylist(currentPlaylistId);
+        }
+
+        async function deletePlaylist() {
+            if (!currentPlaylistId) return;
+            const password = prompt("Enter deletion password:");
+            if (!password) return;
+            if (!confirm('Delete this playlist?')) return;
+
+            const res = await fetch(`/api/playlists/${currentPlaylistId}`, {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({password})
+            });
+            const data = await res.json();
+            if (data.error) { alert(data.error); return; }
+            closeDetail();
+            loadPlaylists();
+        }
+
+        // Modal functions
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Close on backdrop click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', e => {
+                if (e.target === overlay) {
+                    overlay.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+        });
+
+        // Constants for status colors (replicated from main)
+        const STATUS_COLORS = {
+            "Not Started": "#6b7280",
+            "WIP": "#fbbf24",
+            "Review": "#60a5fa",
+            "Approved": "#4ade80",
+            "On Hold": "#f87171",
+            "Omit": "#888888"
+        };
+    </script>
+</body>
+</html>

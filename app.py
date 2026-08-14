@@ -2,10 +2,10 @@ import os
 import csv
 import io
 import re
+import json
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-import json
 
 app = Flask(__name__)
 
@@ -45,7 +45,7 @@ class Show(db.Model):
     notes = db.Column(db.Text)
     status = db.Column(db.String(50), default='Active')
     created_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
-    thumbnail = db.Column(db.String(500))  # NEW – show thumbnail
+    thumbnail = db.Column(db.String(500))
 
 class Sequence(db.Model):
     __tablename__ = 'sequences'
@@ -83,12 +83,22 @@ class Shot(db.Model):
     notes = db.Column(db.Text)
     created_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
     updated_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
-    # NEW FIELDS
-    client_status = db.Column(db.String(50), default='Not Sent')  # Not Sent, Pending, Approved, Changes Requested
+    client_status = db.Column(db.String(50), default='Not Sent')
     client_notes = db.Column(db.Text)
     client_sent_date = db.Column(db.String(50))
     client_approved_date = db.Column(db.String(50))
-    department = db.Column(db.String(50))  # Animation, Modeling, CFX, etc.
+    department = db.Column(db.String(200))
+    thumbnail = db.Column(db.String(500))
+    tasks = db.Column(db.String(500))
+
+class Playlist(db.Model):
+    __tablename__ = 'playlists'
+    id = db.Column(db.Integer, primary_key=True)
+    show_id = db.Column(db.Integer, db.ForeignKey('shows.id'), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    shot_ids = db.Column(db.Text)  # JSON array
+    created_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
 
 class History(db.Model):
     __tablename__ = 'history'
@@ -123,14 +133,15 @@ CLIENT_STATUS_COLORS = {
     "Not Sent": "#6b7280",
     "Pending": "#fbbf24",
     "Approved": "#4ade80",
-    "Changes Requested": "#f87171"
+    "Changes Requested": "#f87171",
+    "Retake": "#fb923c"
 }
 
 SHOT_TYPES = ["VFX", "CG", "Cleanup", "Roto", "Matchmove", "Paint", "Compositing", "Full CG", "Element"]
 DEPARTMENTS = ["Animation", "Modeling", "Layout", "Matchmove", "Roto", "Paint", "CFX", "Groom", "RotoAnim", "Lighting", "Compositing", "FX"]
 PRIORITIES = ["Low", "Normal", "High", "Critical"]
 STATUSES = ["Not Started", "WIP", "Review", "Approved", "On Hold", "Omit"]
-CLIENT_STATUSES = ["Not Sent", "Pending", "Approved", "Changes Requested"]
+CLIENT_STATUSES = ["Not Sent", "Pending", "Approved", "Changes Requested", "Retake"]
 
 # =============================================================================
 # HELPERS
@@ -176,6 +187,10 @@ def parse_shot_pattern(pattern, count):
         result.append(f"{prefix}{new_num}{suffix}")
     return result
 
+def get_client_visible_shots(show_id):
+    shots = Shot.query.filter_by(show_id=show_id).all()
+    return [s for s in shots if s.client_status in ['Approved', 'Changes Requested']]
+
 # =============================================================================
 # ROUTES - MAIN PAGES
 # =============================================================================
@@ -196,6 +211,10 @@ def client_updates():
 @app.route('/department/<dept_name>')
 def department_view(dept_name):
     return render_template('department_view.html', department=dept_name)
+
+@app.route('/playlists')
+def playlists():
+    return render_template('playlists.html')
 
 # =============================================================================
 # API - SHOWS
@@ -284,6 +303,7 @@ def delete_show(show_id):
     Sequence.query.filter_by(show_id=show_id).delete()
     Artist.query.filter_by(show_id=show_id).delete()
     History.query.filter_by(show_id=show_id).delete()
+    Playlist.query.filter_by(show_id=show_id).delete()
     db.session.delete(show)
     db.session.commit()
     return jsonify({"success": True})
@@ -291,6 +311,17 @@ def delete_show(show_id):
 @app.route('/api/shows/<int:show_id>/stats', methods=['GET'])
 def show_stats(show_id):
     return jsonify(get_show_stats(show_id))
+
+@app.route('/api/shows/<int:show_id>/client_shots', methods=['GET'])
+def get_client_shots(show_id):
+    shots = get_client_visible_shots(show_id)
+    return jsonify([{
+        "id": s.id, "sequence_id": s.sequence_id, "name": s.name,
+        "shot_type": s.shot_type, "status": s.status, "priority": s.priority,
+        "assigned_to": s.assigned_to, "client_status": s.client_status,
+        "client_notes": s.client_notes, "client_sent_date": s.client_sent_date,
+        "client_approved_date": s.client_approved_date, "department": s.department
+    } for s in shots])
 
 # =============================================================================
 # API - SEQUENCES
@@ -404,7 +435,7 @@ def get_shots(show_id):
         "created_at": s.created_at, "updated_at": s.updated_at,
         "client_status": s.client_status, "client_notes": s.client_notes,
         "client_sent_date": s.client_sent_date, "client_approved_date": s.client_approved_date,
-        "department": s.department
+        "department": s.department, "thumbnail": s.thumbnail, "tasks": s.tasks
     } for s in shots])
 
 @app.route('/api/shows/<int:show_id>/shots', methods=['POST'])
@@ -417,7 +448,8 @@ def create_shot(show_id):
         duration=data.get('duration', ''), status=data.get('status', 'Not Started'),
         priority=data.get('priority', 'Normal'), assigned_to=data.get('assigned_to', ''),
         notes=data.get('notes', ''), department=data.get('department', ''),
-        client_status=data.get('client_status', 'Not Sent')
+        client_status=data.get('client_status', 'Not Sent'),
+        tasks=data.get('tasks', '')
     )
     db.session.add(shot)
     db.session.commit()
@@ -469,6 +501,16 @@ def update_shot(shot_id):
     shot.assigned_to = data.get('assigned_to', shot.assigned_to)
     shot.notes = data.get('notes', shot.notes)
     shot.department = data.get('department', shot.department)
+    shot.client_status = data.get('client_status', shot.client_status)
+    shot.client_notes = data.get('client_notes', shot.client_notes)
+    shot.tasks = data.get('tasks', shot.tasks)
+    shot.thumbnail = data.get('thumbnail', shot.thumbnail)
+    
+    if shot.client_status == 'Pending' and not shot.client_sent_date:
+        shot.client_sent_date = datetime.now().isoformat()
+    elif shot.client_status == 'Approved' and not shot.client_approved_date:
+        shot.client_approved_date = datetime.now().isoformat()
+    
     shot.updated_at = datetime.now().isoformat()
     db.session.commit()
     log_action(shot.show_id, f"Shot '{shot.name}' updated")
@@ -503,13 +545,23 @@ def update_client_status(shot_id):
     data = request.json
     shot.client_status = data.get('client_status', shot.client_status)
     shot.client_notes = data.get('client_notes', shot.client_notes)
-    if data.get('client_status') == 'Pending':
+    
+    if shot.client_status == 'Pending' and not shot.client_sent_date:
         shot.client_sent_date = datetime.now().isoformat()
-    elif data.get('client_status') == 'Approved':
+    elif shot.client_status == 'Approved' and not shot.client_approved_date:
         shot.client_approved_date = datetime.now().isoformat()
+    
     shot.updated_at = datetime.now().isoformat()
     db.session.commit()
     log_action(shot.show_id, f"Shot '{shot.name}' client status updated to {shot.client_status}")
+    return jsonify({"success": True})
+
+@app.route('/api/shots/<int:shot_id>/thumbnail', methods=['PATCH'])
+def update_shot_thumbnail(shot_id):
+    shot = Shot.query.get_or_404(shot_id)
+    data = request.json
+    shot.thumbnail = data.get('thumbnail', shot.thumbnail)
+    db.session.commit()
     return jsonify({"success": True})
 
 # =============================================================================
@@ -518,20 +570,69 @@ def update_client_status(shot_id):
 
 @app.route('/api/department/<dept_name>/shots')
 def get_department_shots(dept_name):
-    # Get all shots for the current show
     show_id = request.args.get('show_id', type=int)
     if not show_id:
         return jsonify({"error": "show_id required"}), 400
     
-    shots = Shot.query.filter_by(show_id=show_id, department=dept_name).all()
+    shots = Shot.query.filter_by(show_id=show_id).all()
+    filtered = [s for s in shots if dept_name in (s.department or '').split(',')]
+    
     return jsonify([{
         "id": s.id, "sequence_id": s.sequence_id, "name": s.name,
         "description": s.description, "shot_type": s.shot_type,
         "frames": s.frames, "duration": s.duration, "status": s.status,
         "priority": s.priority, "assigned_to": s.assigned_to, "notes": s.notes,
-        "created_at": s.created_at, "updated_at": s.updated_at,
-        "client_status": s.client_status, "department": s.department
-    } for s in shots])
+        "client_status": s.client_status, "department": s.department,
+        "thumbnail": s.thumbnail
+    } for s in filtered])
+
+# =============================================================================
+# API - PLAYLISTS
+# =============================================================================
+
+@app.route('/api/shows/<int:show_id>/playlists', methods=['GET'])
+def get_playlists(show_id):
+    playlists = Playlist.query.filter_by(show_id=show_id).all()
+    return jsonify([{
+        "id": p.id, "name": p.name, "description": p.description,
+        "shot_ids": json.loads(p.shot_ids) if p.shot_ids else [],
+        "created_at": p.created_at
+    } for p in playlists])
+
+@app.route('/api/shows/<int:show_id>/playlists', methods=['POST'])
+def create_playlist(show_id):
+    data = request.json
+    playlist = Playlist(
+        show_id=show_id,
+        name=data.get('name', ''),
+        description=data.get('description', ''),
+        shot_ids=json.dumps(data.get('shot_ids', []))
+    )
+    db.session.add(playlist)
+    db.session.commit()
+    log_action(show_id, f"Playlist '{playlist.name}' created")
+    return jsonify({"success": True, "id": playlist.id})
+
+@app.route('/api/playlists/<int:playlist_id>', methods=['PUT'])
+def update_playlist(playlist_id):
+    playlist = Playlist.query.get_or_404(playlist_id)
+    data = request.json
+    playlist.name = data.get('name', playlist.name)
+    playlist.description = data.get('description', playlist.description)
+    playlist.shot_ids = json.dumps(data.get('shot_ids', []))
+    db.session.commit()
+    return jsonify({"success": True})
+
+@app.route('/api/playlists/<int:playlist_id>', methods=['DELETE'])
+def delete_playlist(playlist_id):
+    data = request.json
+    password = data.get('password', '')
+    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+        return jsonify({"success": False, "error": "Incorrect password"}), 403
+    playlist = Playlist.query.get_or_404(playlist_id)
+    db.session.delete(playlist)
+    db.session.commit()
+    return jsonify({"success": True})
 
 # =============================================================================
 # API - ARTIST VIEW (cross-show)
@@ -549,7 +650,8 @@ def get_artist_shots(name):
             "sequence_name": seq.name if seq else "", "status": shot.status,
             "priority": shot.priority, "shot_type": shot.shot_type,
             "frames": shot.frames, "duration": shot.duration, "notes": shot.notes,
-            "client_status": shot.client_status, "department": shot.department
+            "client_status": shot.client_status, "department": shot.department,
+            "thumbnail": shot.thumbnail
         })
     return jsonify(result)
 

@@ -55,10 +55,16 @@
             align-items: center;
             padding: 8px 0;
         }
-        .seq-filter-label {
-            font-size: 13px;
-            color: var(--text2);
-            margin-right: 4px;
+        .client-status-select {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 4px 10px;
+            font-weight: 600;
+            font-size: 11px;
+            cursor: pointer;
+            color: var(--text);
+            min-width: 100px;
         }
     </style>
 </head>
@@ -72,8 +78,6 @@
             </div>
             <div class="header-actions">
                 <a href="/artist_view" class="btn btn-secondary" target="_blank">&#128100; Artist View</a>
-                <a href="/client_updates" class="btn btn-secondary">&#128196; Client Updates</a>
-                <a href="/department/Compositing" class="btn btn-secondary">&#128295; Dept View</a>
                 <button class="btn btn-primary" onclick="openAddShowModal()">+ Add Show</button>
             </div>
         </header>
@@ -99,6 +103,9 @@
                     <button class="nav-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">
                         <span class="nav-icon">&#128202;</span> Dashboard
                     </button>
+                    <button class="nav-btn" data-tab="playlists" onclick="window.location.href='/playlists'">
+                        <span class="nav-icon">&#127908;</span> Playlists
+                    </button>
                     <button class="nav-btn" data-tab="sequences" onclick="switchTab('sequences')">
                         <span class="nav-icon">&#127903;</span> Sequences
                     </button>
@@ -107,6 +114,12 @@
                     </button>
                     <button class="nav-btn" data-tab="artists" onclick="switchTab('artists')">
                         <span class="nav-icon">&#128104;&#8205;&#127912;</span> Artists
+                    </button>
+                    <button class="nav-btn" data-tab="client_updates" onclick="switchTab('client_updates')">
+                        <span class="nav-icon">&#128196;</span> Client Updates
+                    </button>
+                    <button class="nav-btn" data-tab="department" onclick="switchTab('department')">
+                        <span class="nav-icon">&#128295;</span> Dept View
                     </button>
                     <button class="nav-btn" data-tab="reports" onclick="switchTab('reports')">
                         <span class="nav-icon">&#128221;</span> Reports
@@ -137,6 +150,10 @@
                         <div class="chart-card">
                             <h3>Status Distribution</h3>
                             <canvas id="statusChart"></canvas>
+                        </div>
+                        <div class="chart-card">
+                            <h3>Client Status</h3>
+                            <canvas id="clientChart"></canvas>
                         </div>
                         <div class="chart-card">
                             <h3>Recent Activity</h3>
@@ -188,7 +205,7 @@
                             <button onclick="deselectAllSequences()">Deselect All</button>
                         </div>
                     </div>
-                    <!-- Existing filters + Department dropdown -->
+                    <!-- Filters -->
                     <div class="filters-bar">
                         <input type="text" class="filter-input" id="shotSearch" placeholder="Search shots..." oninput="filterShots()">
                         <select class="filter-select" id="filterStatus" onchange="filterShots()">
@@ -255,6 +272,103 @@
                     </div>
                 </div>
 
+                <!-- Client Updates Tab -->
+                <div class="tab-panel" id="panel-client_updates">
+                    <div class="section-header">
+                        <h2>Client Updates</h2>
+                    </div>
+                    <div class="stats-grid" id="clientStats" style="grid-template-columns: repeat(4, 1fr);">
+                        <div class="stat-card"><div class="stat-value" id="clientTotal">0</div><div class="stat-label">Total Client Shots</div></div>
+                        <div class="stat-card"><div class="stat-value" id="clientApproved" style="color:#4ade80;">0</div><div class="stat-label">Approved</div></div>
+                        <div class="stat-card"><div class="stat-value" id="clientChanges" style="color:#f87171;">0</div><div class="stat-label">Changes Requested</div></div>
+                        <div class="stat-card"><div class="stat-value" id="clientPending" style="color:#fbbf24;">0</div><div class="stat-label">Pending</div></div>
+                    </div>
+                    <div class="filters-bar">
+                        <input type="text" class="filter-input" id="clientSearch" placeholder="Search shots..." oninput="loadClientShots()">
+                        <select class="filter-select" id="clientFilterStatus" onchange="loadClientShots()">
+                            <option value="">All Client Status</option>
+                            <option>Approved</option>
+                            <option>Changes Requested</option>
+                            <option>Pending</option>
+                            <option>Not Sent</option>
+                            <option>Retake</option>
+                        </select>
+                        <select class="filter-select" id="clientFilterSequence" onchange="loadClientShots()">
+                            <option value="">All Sequences</option>
+                        </select>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="clientTable">
+                            <thead>
+                                <tr>
+                                    <th>Shot Name</th>
+                                    <th>Sequence</th>
+                                    <th>Internal Status</th>
+                                    <th>Client Status</th>
+                                    <th>Client Notes</th>
+                                    <th>Sent Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientTableBody">
+                                <tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px;">Loading shots...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Department View Tab -->
+                <div class="tab-panel" id="panel-department">
+                    <div class="section-header">
+                        <h2 id="deptTitle">Department View</h2>
+                    </div>
+                    <div class="filters-bar">
+                        <select class="filter-select" id="deptSelect" onchange="loadDepartmentShots()">
+                            <option value="Animation">Animation</option>
+                            <option value="Modeling">Modeling</option>
+                            <option value="Layout">Layout</option>
+                            <option value="Matchmove">Matchmove</option>
+                            <option value="Roto">Roto</option>
+                            <option value="Paint">Paint</option>
+                            <option value="CFX">CFX</option>
+                            <option value="Groom">Groom</option>
+                            <option value="RotoAnim">RotoAnim</option>
+                            <option value="Lighting">Lighting</option>
+                            <option value="Compositing">Compositing</option>
+                            <option value="FX">FX</option>
+                        </select>
+                        <select class="filter-select" id="deptSeqFilter" onchange="loadDepartmentShots()">
+                            <option value="">All Sequences</option>
+                        </select>
+                        <select class="filter-select" id="deptStatusFilter" onchange="loadDepartmentShots()">
+                            <option value="">All Statuses</option>
+                            <option>Not Started</option>
+                            <option>WIP</option>
+                            <option>Review</option>
+                            <option>Approved</option>
+                            <option>On Hold</option>
+                            <option>Omit</option>
+                        </select>
+                        <input type="text" class="filter-input" id="deptSearch" placeholder="Search..." oninput="loadDepartmentShots()">
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="deptTable">
+                            <thead>
+                                <tr>
+                                    <th>Shot Name</th>
+                                    <th>Sequence</th>
+                                    <th>Status</th>
+                                    <th>Priority</th>
+                                    <th>Assigned To</th>
+                                    <th>Client Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deptTableBody">
+                                <tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px;">Loading shots...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- Reports Tab -->
                 <div class="tab-panel" id="panel-reports">
                     <div class="section-header">
@@ -287,7 +401,6 @@
     </div>
 
     <!-- ==================== MODALS ==================== -->
-
     <!-- Add/Edit Show Modal -->
     <div class="modal-overlay" id="showModal">
         <div class="modal">
@@ -469,6 +582,20 @@
                             <option>FX</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label>Client Status</label>
+                        <select id="shotClientStatus">
+                            <option value="Not Sent">Not Sent</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Changes Requested">Changes Requested</option>
+                            <option value="Retake">Retake</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group full-width">
+                    <label>Client Notes</label>
+                    <textarea id="shotClientNotes" rows="2" placeholder="Notes for client..."></textarea>
                 </div>
                 <div class="form-group full-width">
                     <label>Description</label>
@@ -653,6 +780,7 @@
     let shots = [];
     let artists = [];
     let statusChart = null;
+    let clientChart = null;
     let editingId = null;
     let editingType = null;
     let selectedSequences = new Set();
@@ -672,6 +800,13 @@
         "Approved": "rgba(74, 222, 128, 0.15)",
         "On Hold": "rgba(248, 113, 113, 0.15)",
         "Omit": "rgba(136, 136, 136, 0.15)"
+    };
+    const CLIENT_STATUS_COLORS = {
+        "Not Sent": "#6b7280",
+        "Pending": "#fbbf24",
+        "Approved": "#4ade80",
+        "Changes Requested": "#f87171",
+        "Retake": "#fb923c"
     };
 
     // ==================== INIT ====================
@@ -722,11 +857,26 @@
         sequences = await seqRes.json();
         shots = await shotRes.json();
         artists = await artRes.json();
-        // Reset sequence filter – select all
         selectedSequences = new Set();
         sequences.forEach(s => selectedSequences.add(s.id));
         if (shots.some(s => !s.sequence_id)) selectedSequences.add('unassigned');
         renderSequenceFilter();
+        // Populate sequence dropdowns
+        populateSequenceDropdowns();
+    }
+
+    function populateSequenceDropdowns() {
+        const dropdowns = ['clientFilterSequence', 'deptSeqFilter'];
+        dropdowns.forEach(id => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            const current = sel.value;
+            sel.innerHTML = '<option value="">All Sequences</option>';
+            sequences.forEach(s => {
+                sel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+            });
+            sel.value = current;
+        });
     }
 
     function refreshCurrentTab() {
@@ -734,6 +884,8 @@
         else if (currentTab === 'sequences') loadSequences();
         else if (currentTab === 'shots') loadShots();
         else if (currentTab === 'artists') loadArtists();
+        else if (currentTab === 'client_updates') loadClientShots();
+        else if (currentTab === 'department') loadDepartmentShots();
         else if (currentTab === 'reports') loadReports();
     }
 
@@ -763,6 +915,7 @@
         const completion = total > 0 ? Math.round(((approved + omit) / total) * 100) : 0;
         document.getElementById('statCompletion').textContent = completion + '%';
 
+        // Status chart
         const ctx = document.getElementById('statusChart').getContext('2d');
         if (statusChart) statusChart.destroy();
         statusChart = new Chart(ctx, {
@@ -782,6 +935,29 @@
             }
         });
 
+        // Client chart
+        const clientCtx = document.getElementById('clientChart').getContext('2d');
+        if (clientChart) clientChart.destroy();
+        const clientLabels = Object.keys(stats.client_counts);
+        const clientData = Object.values(stats.client_counts);
+        clientChart = new Chart(clientCtx, {
+            type: 'doughnut',
+            data: {
+                labels: clientLabels,
+                datasets: [{
+                    data: clientData,
+                    backgroundColor: clientLabels.map(s => CLIENT_STATUS_COLORS[s] || '#6b7280'),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { color: '#f0f1f5' } } }
+            }
+        });
+
+        // Activity
         const histRes = await fetch(`/api/shows/${currentShowId}/history`);
         const history = await histRes.json();
         const list = document.getElementById('activityList');
@@ -793,6 +969,7 @@
             </div>
         `).join('');
 
+        // Show info
         const showRes = await fetch(`/api/shows/${currentShowId}`);
         const show = await showRes.json();
         document.getElementById('showInfoGrid').innerHTML = `
@@ -857,11 +1034,11 @@
         const hasUnassigned = shots.some(s => !s.sequence_id);
         if (hasUnassigned) {
             const active = selectedSequences.has('unassigned') ? 'active' : '';
-            html += `<span class="seq-filter-btn ${active}" data-seq="unassigned" onclick="toggleSequence('unassigned')">Unassigned</span>`;
+            html += `<span class="seq-filter-btn ${active}" onclick="toggleSequence('unassigned')">Unassigned</span>`;
         }
         sequences.forEach(seq => {
             const active = selectedSequences.has(seq.id) ? 'active' : '';
-            html += `<span class="seq-filter-btn ${active}" data-seq="${seq.id}" onclick="toggleSequence(${seq.id})">${seq.name}</span>`;
+            html += `<span class="seq-filter-btn ${active}" onclick="toggleSequence(${seq.id})">${seq.name}</span>`;
         });
         container.innerHTML = html;
     }
@@ -910,7 +1087,7 @@
                    (!status || s.status === status) &&
                    (!priority || s.priority === priority) &&
                    (!artist || s.assigned_to === artist) &&
-                   (!department || s.department === department);
+                   (!department || (s.department || '').split(',').includes(department));
         });
 
         const seqGroups = {};
@@ -950,12 +1127,14 @@
                 <th>Priority</th>
                 <th>Assigned To</th>
                 <th>Department</th>
+                <th>Client Status</th>
                 <th>Actions</th>
             </tr></thead><tbody>`;
 
             group.shots.forEach(shot => {
                 const statusColor = STATUS_BG_COLORS[shot.status] || STATUS_BG_COLORS['Not Started'];
                 const statusTextColor = STATUS_COLORS[shot.status] || STATUS_COLORS['Not Started'];
+                const clientColor = CLIENT_STATUS_COLORS[shot.client_status] || '#6b7280';
                 html += `<tr>
                     <td><strong>${shot.name}</strong></td>
                     <td>${shot.shot_type || '-'}</td>
@@ -975,6 +1154,16 @@
                     <td><span class="priority-badge priority-${shot.priority.toLowerCase()}">${shot.priority}</span></td>
                     <td>${shot.assigned_to || '-'}</td>
                     <td>${shot.department || '-'}</td>
+                    <td>
+                        <select class="client-status-select" style="background:${clientColor}20;color:${clientColor};border-color:${clientColor};"
+                                onchange="updateClientStatus(${shot.id}, this.value)">
+                            <option value="Not Sent" ${shot.client_status==='Not Sent'?'selected':''}>Not Sent</option>
+                            <option value="Pending" ${shot.client_status==='Pending'?'selected':''}>Pending</option>
+                            <option value="Approved" ${shot.client_status==='Approved'?'selected':''}>Approved</option>
+                            <option value="Changes Requested" ${shot.client_status==='Changes Requested'?'selected':''}>Changes Requested</option>
+                            <option value="Retake" ${shot.client_status==='Retake'?'selected':''}>Retake</option>
+                        </select>
+                    </td>
                     <td>
                         <button class="btn-icon" onclick="openEditShotModal(${shot.id})">&#9998;</button>
                         <button class="btn-icon btn-danger" onclick="deleteShot(${shot.id})">&#128465;</button>
@@ -1002,6 +1191,19 @@
         renderShotsBySequence();
     }
 
+    async function updateClientStatus(shotId, clientStatus) {
+        await fetch(`/api/shots/${shotId}/client_status`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({client_status: clientStatus})
+        });
+        const shot = shots.find(s => s.id === shotId);
+        if (shot) shot.client_status = clientStatus;
+        renderShotsBySequence();
+        // Refresh client tab if visible
+        if (currentTab === 'client_updates') loadClientShots();
+    }
+
     // ==================== ARTISTS ====================
     function loadArtists() {
         const tbody = document.querySelector('#artistsTable tbody');
@@ -1017,6 +1219,94 @@
                 <button class="btn-icon btn-danger" onclick="deleteArtist(${a.id})">&#128465;</button>
             </td>
         </tr>`).join('');
+    }
+
+    // ==================== CLIENT UPDATES ====================
+    async function loadClientShots() {
+        if (!currentShowId) return;
+        
+        const search = document.getElementById('clientSearch')?.value?.toLowerCase() || '';
+        const status = document.getElementById('clientFilterStatus')?.value || '';
+        const sequence = document.getElementById('clientFilterSequence')?.value || '';
+        
+        const res = await fetch(`/api/shows/${currentShowId}/client_shots`);
+        let clientShots = await res.json();
+        
+        // Update stats
+        document.getElementById('clientTotal').textContent = clientShots.length;
+        document.getElementById('clientApproved').textContent = clientShots.filter(s => s.client_status === 'Approved').length;
+        document.getElementById('clientChanges').textContent = clientShots.filter(s => s.client_status === 'Changes Requested').length;
+        document.getElementById('clientPending').textContent = clientShots.filter(s => s.client_status === 'Pending').length;
+        
+        // Apply filters
+        clientShots = clientShots.filter(s => {
+            return (!search || s.name.toLowerCase().includes(search)) &&
+                   (!status || s.client_status === status) &&
+                   (!sequence || String(s.sequence_id) === sequence);
+        });
+        
+        const tbody = document.getElementById('clientTableBody');
+        if (clientShots.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px;">No client-visible shots found.</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = clientShots.map(shot => {
+            const seq = sequences.find(s => s.id === shot.sequence_id);
+            const clientColor = CLIENT_STATUS_COLORS[shot.client_status] || '#6b7280';
+            const statusColor = STATUS_BG_COLORS[shot.status] || STATUS_BG_COLORS['Not Started'];
+            const statusTextColor = STATUS_COLORS[shot.status] || STATUS_COLORS['Not Started'];
+            return `<tr>
+                <td><strong>${shot.name}</strong></td>
+                <td>${seq ? seq.name : '-'}</td>
+                <td><span class="status-badge" style="background:${statusColor};color:${statusTextColor}">${shot.status}</span></td>
+                <td><span style="color:${clientColor};font-weight:600;">${shot.client_status}</span></td>
+                <td>${shot.client_notes || '-'}</td>
+                <td style="font-size:12px;color:var(--text3);">${shot.client_sent_date ? formatDate(shot.client_sent_date) : '-'}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ==================== DEPARTMENT VIEW ====================
+    async function loadDepartmentShots() {
+        if (!currentShowId) return;
+        
+        const dept = document.getElementById('deptSelect')?.value || 'Compositing';
+        const seqFilter = document.getElementById('deptSeqFilter')?.value || '';
+        const statusFilter = document.getElementById('deptStatusFilter')?.value || '';
+        const search = document.getElementById('deptSearch')?.value?.toLowerCase() || '';
+        
+        document.getElementById('deptTitle').textContent = `${dept} Department`;
+        
+        const res = await fetch(`/api/department/${dept}/shots?show_id=${currentShowId}`);
+        let deptShots = await res.json();
+        
+        deptShots = deptShots.filter(s => {
+            return (!search || s.name.toLowerCase().includes(search)) &&
+                   (!seqFilter || String(s.sequence_id) === seqFilter) &&
+                   (!statusFilter || s.status === statusFilter);
+        });
+        
+        const tbody = document.getElementById('deptTableBody');
+        if (deptShots.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px;">No shots found for this department.</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = deptShots.map(shot => {
+            const seq = sequences.find(s => s.id === shot.sequence_id);
+            const statusColor = STATUS_BG_COLORS[shot.status] || STATUS_BG_COLORS['Not Started'];
+            const statusTextColor = STATUS_COLORS[shot.status] || STATUS_COLORS['Not Started'];
+            const clientColor = CLIENT_STATUS_COLORS[shot.client_status] || '#6b7280';
+            return `<tr>
+                <td><strong>${shot.name}</strong></td>
+                <td>${seq ? seq.name : '-'}</td>
+                <td><span class="status-badge" style="background:${statusColor};color:${statusTextColor}">${shot.status}</span></td>
+                <td><span class="priority-badge priority-${shot.priority.toLowerCase()}">${shot.priority}</span></td>
+                <td>${shot.assigned_to || '-'}</td>
+                <td><span style="color:${clientColor};font-weight:500;">${shot.client_status}</span></td>
+            </tr>`;
+        }).join('');
     }
 
     // ==================== REPORTS ====================
@@ -1036,7 +1326,7 @@
     function openModal(id) { document.getElementById(id).classList.add('active'); document.body.style.overflow = 'hidden'; }
     function closeModal(id) { document.getElementById(id).classList.remove('active'); document.body.style.overflow = ''; }
 
-    // Show Modal
+    // ==================== SHOW MODAL ====================
     function openAddShowModal() {
         editingId = null; editingType = 'show';
         document.getElementById('showModalTitle').textContent = 'Add Show';
@@ -1118,7 +1408,7 @@
         }
     }
 
-    // Sequence Modal
+    // ==================== SEQUENCE MODAL ====================
     function openAddSequenceModal() {
         editingId = null; editingType = 'sequence';
         document.getElementById('seqModalTitle').textContent = 'Add Sequence';
@@ -1160,7 +1450,7 @@
         loadSequences();
     }
 
-    // Shot Modal
+    // ==================== SHOT MODAL ====================
     function populateShotForm(selectId) {
         const seqSel = document.getElementById(selectId === 'shot' ? 'shotSequence' : 'bulkSequence');
         seqSel.innerHTML = '<option value="">Select Sequence</option>';
@@ -1181,6 +1471,8 @@
         document.getElementById('shotDescription').value = '';
         document.getElementById('shotNotes').value = '';
         document.getElementById('shotDepartment').value = '';
+        document.getElementById('shotClientStatus').value = 'Not Sent';
+        document.getElementById('shotClientNotes').value = '';
         populateShotForm('shot');
         openModal('shotModal');
     }
@@ -1197,6 +1489,8 @@
         document.getElementById('shotDescription').value = shot.description || '';
         document.getElementById('shotNotes').value = shot.notes || '';
         document.getElementById('shotDepartment').value = shot.department || '';
+        document.getElementById('shotClientStatus').value = shot.client_status || 'Not Sent';
+        document.getElementById('shotClientNotes').value = shot.client_notes || '';
         populateShotForm('shot');
         document.getElementById('shotSequence').value = shot.sequence_id || '';
         document.getElementById('shotType').value = shot.shot_type || '';
@@ -1215,7 +1509,9 @@
             priority: document.getElementById('shotPriority').value,
             assigned_to: document.getElementById('shotAssigned').value,
             notes: document.getElementById('shotNotes').value,
-            department: document.getElementById('shotDepartment').value
+            department: document.getElementById('shotDepartment').value,
+            client_status: document.getElementById('shotClientStatus').value,
+            client_notes: document.getElementById('shotClientNotes').value
         };
         if (!data.name) { alert('Shot name is required'); return; }
         const url = editingId ? `/api/shots/${editingId}` : `/api/shows/${currentShowId}/shots`;
@@ -1240,7 +1536,7 @@
         loadShots();
     }
 
-    // Bulk Shot Modal
+    // ==================== BULK SHOT MODAL ====================
     function openBulkShotModal() {
         populateShotForm('bulk');
         document.getElementById('bulkPattern').value = 'Show_seq_01_sh_001';
@@ -1302,7 +1598,7 @@
         loadShots();
     }
 
-    // Artist Modal
+    // ==================== ARTIST MODAL ====================
     function openAddArtistModal() {
         editingId = null; editingType = 'artist';
         document.getElementById('artistModalTitle').textContent = 'Add Artist';
@@ -1359,17 +1655,18 @@
         loadArtists();
     }
 
-    // Export
+    // ==================== EXPORT ====================
     function exportShots() { window.location.href = `/api/shows/${currentShowId}/export/shots`; }
     function exportArtists() { window.location.href = `/api/shows/${currentShowId}/export/artists`; }
 
-    // Utilities
+    // ==================== UTILITIES ====================
     function formatDate(iso) {
         if (!iso) return '';
         const d = new Date(iso);
-        return d.toLocaleString();
+        return d.toLocaleDateString();
     }
 
+    // Close modals on Escape
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
             document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
