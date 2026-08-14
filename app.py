@@ -3,9 +3,11 @@ import csv
 import io
 import re
 import json
-from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file
+import uuid
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
@@ -23,6 +25,13 @@ else:
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vfx-tracker-secret-key-2026')
+
+# File upload config
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'avi', 'webm'}
 # ========================================================
 
 db = SQLAlchemy(app)
@@ -89,7 +98,18 @@ class Shot(db.Model):
     client_approved_date = db.Column(db.String(50))
     department = db.Column(db.String(200))
     thumbnail = db.Column(db.String(500))
-    tasks = db.Column(db.String(500))
+    version = db.Column(db.String(20), default='v001')
+
+class Task(db.Model):
+    __tablename__ = 'tasks'
+    id = db.Column(db.Integer, primary_key=True)
+    shot_id = db.Column(db.Integer, db.ForeignKey('shots.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(50), default='Not Started')
+    assigned_to = db.Column(db.String(200))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
+    updated_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
 
 class Playlist(db.Model):
     __tablename__ = 'playlists'
@@ -97,7 +117,7 @@ class Playlist(db.Model):
     show_id = db.Column(db.Integer, db.ForeignKey('shows.id'), nullable=False)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
-    shot_ids = db.Column(db.Text)  # JSON array
+    shot_ids = db.Column(db.Text)
     created_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
 
 class History(db.Model):
@@ -142,6 +162,8 @@ DEPARTMENTS = ["Animation", "Modeling", "Layout", "Matchmove", "Roto", "Paint", 
 PRIORITIES = ["Low", "Normal", "High", "Critical"]
 STATUSES = ["Not Started", "WIP", "Review", "Approved", "On Hold", "Omit"]
 CLIENT_STATUSES = ["Not Sent", "Pending", "Approved", "Changes Requested", "Retake"]
+TASK_STATUSES = ["Not Started", "In Progress", "Done"]
+TASK_TEMPLATES = ["Modeling", "Texturing", "Rigging", "Animation", "Layout", "Matchmove", "Roto", "Prep", "Lighting", "Comp", "FX"]
 
 # =============================================================================
 # HELPERS
@@ -156,10 +178,6 @@ def get_show_stats(show_id):
     shots = Shot.query.filter_by(show_id=show_id).all()
     sequences = Sequence.query.filter_by(show_id=show_id).all()
     artists = Artist.query.filter_by(show_id=show_id).all()
-    
-    # Debug: print counts to terminal
-    print(f"DEBUG: show_id={show_id}, shots={len(shots)}, artists={len(artists)}")
-    
     counts = {s: 0 for s in STATUSES}
     client_counts = {s: 0 for s in CLIENT_STATUSES}
     for shot in shots:
@@ -195,6 +213,20 @@ def get_client_visible_shots(show_id):
     shots = Shot.query.filter_by(show_id=show_id).all()
     return [s for s in shots if s.client_status in ['Approved', 'Changes Requested']]
 
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_next_version(shot_id):
+    shot = Shot.query.get(shot_id)
+    if not shot:
+        return 'v001'
+    current = shot.version or 'v001'
+    try:
+        num = int(current.replace('v', '')) + 1
+        return f"v{num:03d}"
+    except:
+        return 'v002'
+
 # =============================================================================
 # ROUTES - MAIN PAGES
 # =============================================================================
@@ -219,6 +251,10 @@ def department_view(dept_name):
 @app.route('/playlists')
 def playlists():
     return render_template('playlists.html')
+
+@app.route('/kanban')
+def kanban():
+    return render_template('kanban.html')
 
 # =============================================================================
 # API - SHOWS
@@ -308,6 +344,7 @@ def delete_show(show_id):
     Artist.query.filter_by(show_id=show_id).delete()
     History.query.filter_by(show_id=show_id).delete()
     Playlist.query.filter_by(show_id=show_id).delete()
+    Task.query.filter_by(shot_id=show_id).delete()
     db.session.delete(show)
     db.session.commit()
     return jsonify({"success": True})
@@ -432,24 +469,14 @@ def delete_artist(artist_id):
 def get_shots(show_id):
     shots = Shot.query.filter_by(show_id=show_id).all()
     return jsonify([{
-        "id": s.id,
-        "sequence_id": s.sequence_id,
-        "name": s.name,
-        "description": s.description,
-        "shot_type": s.shot_type,
-        "frames": s.frames,
-        "duration": s.duration,
-        "status": s.status,
-        "priority": s.priority,
-        "assigned_to": s.assigned_to,
-        "notes": s.notes,
-        "created_at": s.created_at,
-        "updated_at": s.updated_at,
-        "client_status": s.client_status,
-        "client_notes": s.client_notes,
-        "client_sent_date": s.client_sent_date,
-        "client_approved_date": s.client_approved_date,
-        "department": s.department
+        "id": s.id, "sequence_id": s.sequence_id, "name": s.name,
+        "description": s.description, "shot_type": s.shot_type,
+        "frames": s.frames, "duration": s.duration, "status": s.status,
+        "priority": s.priority, "assigned_to": s.assigned_to, "notes": s.notes,
+        "created_at": s.created_at, "updated_at": s.updated_at,
+        "client_status": s.client_status, "client_notes": s.client_notes,
+        "client_sent_date": s.client_sent_date, "client_approved_date": s.client_approved_date,
+        "department": s.department, "thumbnail": s.thumbnail, "version": s.version
     } for s in shots])
 
 @app.route('/api/shows/<int:show_id>/shots', methods=['POST'])
@@ -463,7 +490,7 @@ def create_shot(show_id):
         priority=data.get('priority', 'Normal'), assigned_to=data.get('assigned_to', ''),
         notes=data.get('notes', ''), department=data.get('department', ''),
         client_status=data.get('client_status', 'Not Sent'),
-        tasks=data.get('tasks', '')
+        version='v001'
     )
     db.session.add(shot)
     db.session.commit()
@@ -492,7 +519,8 @@ def create_shots_bulk(show_id):
             show_id=show_id, sequence_id=sequence_id, name=name,
             shot_type=shot_type, status=status, priority=priority,
             assigned_to=assigned_to, frames=frames, duration=duration,
-            notes=notes, department=department, client_status='Not Sent'
+            notes=notes, department=department, client_status='Not Sent',
+            version='v001'
         )
         db.session.add(shot)
         created.append(name)
@@ -517,7 +545,6 @@ def update_shot(shot_id):
     shot.department = data.get('department', shot.department)
     shot.client_status = data.get('client_status', shot.client_status)
     shot.client_notes = data.get('client_notes', shot.client_notes)
-    shot.tasks = data.get('tasks', shot.tasks)
     shot.thumbnail = data.get('thumbnail', shot.thumbnail)
     
     if shot.client_status == 'Pending' and not shot.client_sent_date:
@@ -539,6 +566,7 @@ def delete_shot(shot_id):
     shot = Shot.query.get_or_404(shot_id)
     show_id = shot.show_id
     name = shot.name
+    Task.query.filter_by(shot_id=shot_id).delete()
     db.session.delete(shot)
     db.session.commit()
     log_action(show_id, f"Shot '{name}' deleted")
@@ -570,12 +598,159 @@ def update_client_status(shot_id):
     log_action(shot.show_id, f"Shot '{shot.name}' client status updated to {shot.client_status}")
     return jsonify({"success": True})
 
-@app.route('/api/shots/<int:shot_id>/thumbnail', methods=['PATCH'])
-def update_shot_thumbnail(shot_id):
+@app.route('/api/shots/<int:shot_id>/upload', methods=['POST'])
+def upload_shot_file(shot_id):
     shot = Shot.query.get_or_404(shot_id)
-    data = request.json
-    shot.thumbnail = data.get('thumbnail', shot.thumbnail)
+    
+    if 'file' not in request.files:
+        return jsonify({"error": "No file"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    
+    if not allowed_file(file.filename):
+        return jsonify({"error": "File type not allowed"}), 400
+    
+    # Generate unique filename
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    filename = f"{shot.id}_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+    
+    # Update shot thumbnail
+    shot.thumbnail = f"/static/uploads/{filename}"
+    
+    # Auto-bump version
+    old_version = shot.version or 'v001'
+    try:
+        num = int(old_version.replace('v', '')) + 1
+        shot.version = f"v{num:03d}"
+    except:
+        shot.version = 'v002'
+    
+    shot.updated_at = datetime.now().isoformat()
     db.session.commit()
+    
+    log_action(shot.show_id, f"File uploaded for shot '{shot.name}' v{shot.version}")
+    return jsonify({
+        "success": True,
+        "thumbnail": shot.thumbnail,
+        "version": shot.version
+    })
+
+# =============================================================================
+# API - TASKS
+# =============================================================================
+
+@app.route('/api/shots/<int:shot_id>/tasks', methods=['GET'])
+def get_tasks(shot_id):
+    tasks = Task.query.filter_by(shot_id=shot_id).all()
+    return jsonify([{
+        "id": t.id, "shot_id": t.shot_id, "name": t.name,
+        "status": t.status, "assigned_to": t.assigned_to,
+        "notes": t.notes, "created_at": t.created_at, "updated_at": t.updated_at
+    } for t in tasks])
+
+@app.route('/api/shots/<int:shot_id>/tasks', methods=['POST'])
+def create_task(shot_id):
+    data = request.json
+    task = Task(
+        shot_id=shot_id,
+        name=data.get('name', ''),
+        status=data.get('status', 'Not Started'),
+        assigned_to=data.get('assigned_to', ''),
+        notes=data.get('notes', '')
+    )
+    db.session.add(task)
+    db.session.commit()
+    log_action(Shot.query.get(shot_id).show_id, f"Task '{task.name}' added to shot")
+    return jsonify({"success": True, "id": task.id})
+
+@app.route('/api/shots/<int:shot_id>/tasks/bulk', methods=['POST'])
+def create_tasks_bulk(shot_id):
+    data = request.json
+    task_names = data.get('tasks', [])
+    created = []
+    for name in task_names:
+        task = Task(
+            shot_id=shot_id,
+            name=name,
+            status='Not Started',
+            assigned_to=''
+        )
+        db.session.add(task)
+        created.append(name)
+    db.session.commit()
+    return jsonify({"success": True, "created": len(created)})
+
+@app.route('/api/tasks/<int:task_id>', methods=['PUT'])
+def update_task(task_id):
+    task = Task.query.get_or_404(task_id)
+    data = request.json
+    task.status = data.get('status', task.status)
+    task.assigned_to = data.get('assigned_to', task.assigned_to)
+    task.notes = data.get('notes', task.notes)
+    task.updated_at = datetime.now().isoformat()
+    db.session.commit()
+    return jsonify({"success": True})
+
+@app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+def delete_task(task_id):
+    task = Task.query.get_or_404(task_id)
+    db.session.delete(task)
+    db.session.commit()
+    return jsonify({"success": True})
+
+# =============================================================================
+# API - KANBAN
+# =============================================================================
+
+@app.route('/api/kanban/<int:show_id>', methods=['GET'])
+def get_kanban(show_id):
+    sequence_filter = request.args.get('sequence', type=int)
+    
+    query = Shot.query.filter_by(show_id=show_id)
+    if sequence_filter:
+        query = query.filter_by(sequence_id=sequence_filter)
+    
+    shots = query.all()
+    
+    columns = {}
+    for status in STATUSES:
+        columns[status] = []
+    
+    for shot in shots:
+        if shot.status in columns:
+            columns[shot.status].append({
+                "id": shot.id,
+                "name": shot.name,
+                "sequence_id": shot.sequence_id,
+                "status": shot.status,
+                "priority": shot.priority,
+                "assigned_to": shot.assigned_to,
+                "thumbnail": shot.thumbnail,
+                "version": shot.version,
+                "shot_type": shot.shot_type,
+                "department": shot.department,
+                "task_count": Task.query.filter_by(shot_id=shot.id).count(),
+                "tasks_done": Task.query.filter_by(shot_id=shot.id, status='Done').count()
+            })
+    
+    return jsonify(columns)
+
+@app.route('/api/kanban/move', methods=['POST'])
+def move_kanban_card():
+    data = request.json
+    shot_id = data.get('shot_id')
+    new_status = data.get('status')
+    
+    shot = Shot.query.get_or_404(shot_id)
+    shot.status = new_status
+    shot.updated_at = datetime.now().isoformat()
+    db.session.commit()
+    
+    log_action(shot.show_id, f"Shot '{shot.name}' moved to {new_status}")
     return jsonify({"success": True})
 
 # =============================================================================
@@ -597,7 +772,7 @@ def get_department_shots(dept_name):
         "frames": s.frames, "duration": s.duration, "status": s.status,
         "priority": s.priority, "assigned_to": s.assigned_to, "notes": s.notes,
         "client_status": s.client_status, "department": s.department,
-        "thumbnail": s.thumbnail
+        "thumbnail": s.thumbnail, "version": s.version
     } for s in filtered])
 
 # =============================================================================
@@ -665,7 +840,7 @@ def get_artist_shots(name):
             "priority": shot.priority, "shot_type": shot.shot_type,
             "frames": shot.frames, "duration": shot.duration, "notes": shot.notes,
             "client_status": shot.client_status, "department": shot.department,
-            "thumbnail": shot.thumbnail
+            "thumbnail": shot.thumbnail, "version": shot.version
         })
     return jsonify(result)
 
@@ -693,13 +868,13 @@ def export_shots(show_id):
     shots = Shot.query.filter_by(show_id=show_id).all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Shot Name", "Sequence", "Type", "Frames", "Duration", "Status", "Priority", "Assigned To", "Client Status", "Department", "Notes"])
+    writer.writerow(["Shot Name", "Sequence", "Type", "Frames", "Duration", "Status", "Priority", "Assigned To", "Client Status", "Department", "Version", "Notes"])
     for shot in shots:
         seq = Sequence.query.get(shot.sequence_id) if shot.sequence_id else None
         writer.writerow([
             shot.name, seq.name if seq else "", shot.shot_type, shot.frames,
             shot.duration, shot.status, shot.priority, shot.assigned_to or "",
-            shot.client_status, shot.department or "", shot.notes or ""
+            shot.client_status, shot.department or "", shot.version or "v001", shot.notes or ""
         ])
     output.seek(0)
     return send_file(
@@ -727,11 +902,35 @@ def export_artists(show_id):
     )
 
 # =============================================================================
+# STATIC FILES
+# =============================================================================
+
+@app.route('/static/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# =============================================================================
+# DEBUG ROUTES
+# =============================================================================
+
+@app.route('/debug/db')
+def debug_db():
+    try:
+        shows = Show.query.all()
+        return jsonify({
+            "shows_count": len(shows),
+            "shows": [{"id": s.id, "name": s.name} for s in shows],
+            "shots_count": Shot.query.count()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# =============================================================================
 # INIT - CREATE TABLES ON STARTUP
 # =============================================================================
 
 with app.app_context():
     db.create_all()
-    
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
