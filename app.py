@@ -6,22 +6,29 @@ import json
 import uuid
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
 # ==================== DATABASE CONFIG ====================
-DATABASE_URL = os.environ.get('DATABASE_URL')
+# Get DATABASE_URL from environment, strip whitespace
+DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
+
 if DATABASE_URL:
+    # Ensure it's a valid SQLAlchemy URL
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+    print(f"Using PostgreSQL: {DATABASE_URL[:30]}...")
 else:
+    # Local SQLite
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, 'data')
     os.makedirs(DATA_DIR, exist_ok=True)
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(DATA_DIR, "shows.db").replace(chr(92), "/")}'
+    db_path = os.path.join(DATA_DIR, 'shows.db').replace('\\', '/')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    print(f"Using SQLite: {db_path}")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vfx-tracker-secret-key-2026')
@@ -30,7 +37,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vfx-tracker-secret-key-
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'avi', 'webm'}
 # ========================================================
 
@@ -99,6 +106,9 @@ class Shot(db.Model):
     department = db.Column(db.String(200))
     thumbnail = db.Column(db.String(500))
     version = db.Column(db.String(20), default='v001')
+    bid_days = db.Column(db.Integer, default=0)
+    used_days = db.Column(db.Integer, default=0)
+    deadline = db.Column(db.String(50))
 
 class Task(db.Model):
     __tablename__ = 'tasks'
@@ -216,16 +226,25 @@ def get_client_visible_shots(show_id):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def get_next_version(shot_id):
-    shot = Shot.query.get(shot_id)
-    if not shot:
-        return 'v001'
-    current = shot.version or 'v001'
+def get_deadline_status(delivery_date):
+    if not delivery_date:
+        return {"status": "unknown", "days": 0, "color": "#6b7280", "label": "No deadline"}
     try:
-        num = int(current.replace('v', '')) + 1
-        return f"v{num:03d}"
+        deadline = datetime.fromisoformat(delivery_date)
+        now = datetime.now()
+        days = (deadline - now).days
+        if days < 0:
+            return {"status": "overdue", "days": days, "color": "#ef4444", "label": f"{abs(days)}d overdue"}
+        elif days < 7:
+            return {"status": "critical", "days": days, "color": "#ef4444", "label": f"{days}d left"}
+        elif days < 14:
+            return {"status": "warning", "days": days, "color": "#fb923c", "label": f"{days}d left"}
+        elif days < 30:
+            return {"status": "attention", "days": days, "color": "#fbbf24", "label": f"{days}d left"}
+        else:
+            return {"status": "good", "days": days, "color": "#4ade80", "label": f"{days}d left"}
     except:
-        return 'v002'
+        return {"status": "unknown", "days": 0, "color": "#6b7280", "label": "Invalid date"}
 
 # =============================================================================
 # ROUTES - MAIN PAGES
@@ -251,10 +270,6 @@ def department_view(dept_name):
 @app.route('/playlists')
 def playlists():
     return render_template('playlists.html')
-
-@app.route('/kanban')
-def kanban():
-    return render_template('kanban.html')
 
 # =============================================================================
 # API - SHOWS
@@ -476,7 +491,8 @@ def get_shots(show_id):
         "created_at": s.created_at, "updated_at": s.updated_at,
         "client_status": s.client_status, "client_notes": s.client_notes,
         "client_sent_date": s.client_sent_date, "client_approved_date": s.client_approved_date,
-        "department": s.department, "thumbnail": s.thumbnail, "version": s.version
+        "department": s.department, "thumbnail": s.thumbnail, "version": s.version,
+        "bid_days": s.bid_days, "used_days": s.used_days, "deadline": s.deadline
     } for s in shots])
 
 @app.route('/api/shows/<int:show_id>/shots', methods=['POST'])
@@ -490,7 +506,10 @@ def create_shot(show_id):
         priority=data.get('priority', 'Normal'), assigned_to=data.get('assigned_to', ''),
         notes=data.get('notes', ''), department=data.get('department', ''),
         client_status=data.get('client_status', 'Not Sent'),
-        version='v001'
+        version='v001',
+        bid_days=data.get('bid_days', 0),
+        used_days=data.get('used_days', 0),
+        deadline=data.get('deadline', '')
     )
     db.session.add(shot)
     db.session.commit()
@@ -511,6 +530,8 @@ def create_shots_bulk(show_id):
     duration = data.get('duration', '')
     notes = data.get('notes', '')
     department = data.get('department', '')
+    bid_days = data.get('bid_days', 0)
+    deadline = data.get('deadline', '')
     
     names = parse_shot_pattern(pattern, count)
     created = []
@@ -520,7 +541,7 @@ def create_shots_bulk(show_id):
             shot_type=shot_type, status=status, priority=priority,
             assigned_to=assigned_to, frames=frames, duration=duration,
             notes=notes, department=department, client_status='Not Sent',
-            version='v001'
+            version='v001', bid_days=bid_days, deadline=deadline
         )
         db.session.add(shot)
         created.append(name)
@@ -546,6 +567,9 @@ def update_shot(shot_id):
     shot.client_status = data.get('client_status', shot.client_status)
     shot.client_notes = data.get('client_notes', shot.client_notes)
     shot.thumbnail = data.get('thumbnail', shot.thumbnail)
+    shot.bid_days = data.get('bid_days', shot.bid_days)
+    shot.used_days = data.get('used_days', shot.used_days)
+    shot.deadline = data.get('deadline', shot.deadline)
     
     if shot.client_status == 'Pending' and not shot.client_sent_date:
         shot.client_sent_date = datetime.now().isoformat()
@@ -612,16 +636,13 @@ def upload_shot_file(shot_id):
     if not allowed_file(file.filename):
         return jsonify({"error": "File type not allowed"}), 400
     
-    # Generate unique filename
     ext = file.filename.rsplit('.', 1)[1].lower()
     filename = f"{shot.id}_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
     
-    # Update shot thumbnail
     shot.thumbnail = f"/static/uploads/{filename}"
     
-    # Auto-bump version
     old_version = shot.version or 'v001'
     try:
         num = int(old_version.replace('v', '')) + 1
@@ -722,6 +743,7 @@ def get_kanban(show_id):
     
     for shot in shots:
         if shot.status in columns:
+            deadline_info = get_deadline_status(shot.deadline)
             columns[shot.status].append({
                 "id": shot.id,
                 "name": shot.name,
@@ -733,6 +755,10 @@ def get_kanban(show_id):
                 "version": shot.version,
                 "shot_type": shot.shot_type,
                 "department": shot.department,
+                "bid_days": shot.bid_days,
+                "used_days": shot.used_days,
+                "deadline": shot.deadline,
+                "deadline_status": deadline_info,
                 "task_count": Task.query.filter_by(shot_id=shot.id).count(),
                 "tasks_done": Task.query.filter_by(shot_id=shot.id, status='Done').count()
             })
@@ -772,7 +798,8 @@ def get_department_shots(dept_name):
         "frames": s.frames, "duration": s.duration, "status": s.status,
         "priority": s.priority, "assigned_to": s.assigned_to, "notes": s.notes,
         "client_status": s.client_status, "department": s.department,
-        "thumbnail": s.thumbnail, "version": s.version
+        "thumbnail": s.thumbnail, "version": s.version,
+        "bid_days": s.bid_days, "used_days": s.used_days, "deadline": s.deadline
     } for s in filtered])
 
 # =============================================================================
@@ -840,7 +867,8 @@ def get_artist_shots(name):
             "priority": shot.priority, "shot_type": shot.shot_type,
             "frames": shot.frames, "duration": shot.duration, "notes": shot.notes,
             "client_status": shot.client_status, "department": shot.department,
-            "thumbnail": shot.thumbnail, "version": shot.version
+            "thumbnail": shot.thumbnail, "version": shot.version,
+            "bid_days": shot.bid_days, "used_days": shot.used_days, "deadline": shot.deadline
         })
     return jsonify(result)
 
@@ -868,13 +896,14 @@ def export_shots(show_id):
     shots = Shot.query.filter_by(show_id=show_id).all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Shot Name", "Sequence", "Type", "Frames", "Duration", "Status", "Priority", "Assigned To", "Client Status", "Department", "Version", "Notes"])
+    writer.writerow(["Shot Name", "Sequence", "Type", "Frames", "Duration", "Status", "Priority", "Assigned To", "Client Status", "Department", "Version", "Bid Days", "Used Days", "Deadline", "Notes"])
     for shot in shots:
         seq = Sequence.query.get(shot.sequence_id) if shot.sequence_id else None
         writer.writerow([
             shot.name, seq.name if seq else "", shot.shot_type, shot.frames,
             shot.duration, shot.status, shot.priority, shot.assigned_to or "",
-            shot.client_status, shot.department or "", shot.version or "v001", shot.notes or ""
+            shot.client_status, shot.department or "", shot.version or "v001",
+            shot.bid_days or 0, shot.used_days or 0, shot.deadline or "", shot.notes or ""
         ])
     output.seek(0)
     return send_file(
