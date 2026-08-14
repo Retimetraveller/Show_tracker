@@ -711,6 +711,7 @@ def export_artists(show_id):
         as_attachment=True,
         download_name=f"{show.name}_artists.csv"
     )
+    @app.route('/debug/shots/<int:show_id>')
 
 # =============================================================================
 # INIT - CREATE TABLES ON STARTUP
