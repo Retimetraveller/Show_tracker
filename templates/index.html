@@ -6,6 +6,61 @@
     <title>VFX Show Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .seq-filter-btn {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text2);
+            transition: all 0.15s;
+            user-select: none;
+        }
+        .seq-filter-btn.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+        .seq-filter-btn:hover {
+            background: var(--elevated);
+        }
+        .seq-filter-btn.active:hover {
+            background: #3b82f6;
+        }
+        .filter-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .filter-actions button {
+            background: var(--elevated);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .filter-actions button:hover {
+            background: var(--border);
+        }
+        .seq-filter-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 0;
+        }
+        .seq-filter-label {
+            font-size: 13px;
+            color: var(--text2);
+            margin-right: 4px;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -122,6 +177,18 @@
                             <button class="btn btn-secondary" onclick="openAddShotModal()">+ Add Single</button>
                         </div>
                     </div>
+                    <!-- Sequence Filter (new) -->
+                    <div class="filters-bar" style="flex-wrap:wrap;gap:8px;align-items:center;">
+                        <span style="font-size:13px;color:var(--text2);">Filter by Sequence:</span>
+                        <div id="sequenceFilterContainer" class="seq-filter-container">
+                            <!-- checkboxes will be rendered here -->
+                        </div>
+                        <div class="filter-actions">
+                            <button onclick="selectAllSequences()">Select All</button>
+                            <button onclick="deselectAllSequences()">Deselect All</button>
+                        </div>
+                    </div>
+                    <!-- Existing filters -->
                     <div class="filters-bar">
                         <input type="text" class="filter-input" id="shotSearch" placeholder="Search shots..." oninput="filterShots()">
                         <select class="filter-select" id="filterStatus" onchange="filterShots()">
@@ -537,6 +604,7 @@
     let statusChart = null;
     let editingId = null;
     let editingType = null;
+    let selectedSequences = new Set(); // stores sequence IDs (numbers) or 'unassigned'
 
     const STATUS_COLORS = {
         "Not Started": "#6b7280",
@@ -603,6 +671,11 @@
         sequences = await seqRes.json();
         shots = await shotRes.json();
         artists = await artRes.json();
+        // Reset sequence filter when show changes – select all
+        selectedSequences = new Set();
+        sequences.forEach(s => selectedSequences.add(s.id));
+        selectedSequences.add('unassigned');
+        renderSequenceFilter();
     }
 
     function refreshCurrentTab() {
@@ -707,6 +780,7 @@
     // ==================== SHOTS ====================
     function loadShots() {
         updateShotFilters();
+        renderSequenceFilter();
         renderShotsBySequence();
     }
 
@@ -724,6 +798,54 @@
         renderShotsBySequence();
     }
 
+    // ==================== SEQUENCE FILTER ====================
+    function renderSequenceFilter() {
+        const container = document.getElementById('sequenceFilterContainer');
+        if (!container) return;
+        let html = '';
+        // Show 'Unassigned' option if there are any unassigned shots
+        const hasUnassigned = shots.some(s => !s.sequence_id);
+        if (hasUnassigned) {
+            const active = selectedSequences.has('unassigned') ? 'active' : '';
+            html += `<span class="seq-filter-btn ${active}" data-seq="unassigned" onclick="toggleSequence('unassigned')">Unassigned</span>`;
+        }
+        sequences.forEach(seq => {
+            const active = selectedSequences.has(seq.id) ? 'active' : '';
+            html += `<span class="seq-filter-btn ${active}" data-seq="${seq.id}" onclick="toggleSequence(${seq.id})">${seq.name}</span>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function toggleSequence(seqId) {
+        if (selectedSequences.has(seqId)) {
+            selectedSequences.delete(seqId);
+        } else {
+            selectedSequences.add(seqId);
+        }
+        // If nothing selected, select all (optional)
+        if (selectedSequences.size === 0) {
+            sequences.forEach(s => selectedSequences.add(s.id));
+            if (shots.some(s => !s.sequence_id)) selectedSequences.add('unassigned');
+        }
+        renderSequenceFilter();
+        renderShotsBySequence();
+    }
+
+    function selectAllSequences() {
+        selectedSequences = new Set();
+        sequences.forEach(s => selectedSequences.add(s.id));
+        if (shots.some(s => !s.sequence_id)) selectedSequences.add('unassigned');
+        renderSequenceFilter();
+        renderShotsBySequence();
+    }
+
+    function deselectAllSequences() {
+        selectedSequences = new Set();
+        renderSequenceFilter();
+        renderShotsBySequence();
+    }
+
+    // ==================== RENDER SHOTS BY SEQUENCE ====================
     function renderShotsBySequence() {
         const container = document.getElementById('shotsContainer');
         const search = document.getElementById('shotSearch').value.toLowerCase();
@@ -731,6 +853,7 @@
         const priority = document.getElementById('filterPriority').value;
         const artist = document.getElementById('filterArtist').value;
         
+        // Filter shots based on all criteria
         let filteredShots = shots.filter(s => {
             return (!search || s.name.toLowerCase().includes(search)) &&
                    (!status || s.status === status) &&
@@ -738,6 +861,7 @@
                    (!artist || s.assigned_to === artist);
         });
         
+        // Group by sequence
         const seqGroups = {};
         sequences.forEach(seq => {
             seqGroups[seq.id] = {
@@ -745,13 +869,19 @@
                 shots: filteredShots.filter(s => s.sequence_id === seq.id)
             };
         });
-        seqGroups['unassigned'] = {
-            name: 'Unassigned',
-            shots: filteredShots.filter(s => !s.sequence_id)
-        };
+        // Unassigned group
+        const unassignedShots = filteredShots.filter(s => !s.sequence_id);
+        if (unassignedShots.length > 0) {
+            seqGroups['unassigned'] = {
+                name: 'Unassigned',
+                shots: unassignedShots
+            };
+        }
         
         let html = '';
         for (const [seqId, group] of Object.entries(seqGroups)) {
+            // Skip if this sequence is not selected in filter
+            if (!selectedSequences.has(seqId)) continue;
             if (group.shots.length === 0) continue;
             
             html += `<div class="sequence-group" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;">`;
@@ -817,7 +947,7 @@
         });
         const shot = shots.find(s => s.id === shotId);
         if (shot) shot.status = status;
-        filterShots();
+        renderShotsBySequence();
     }
 
     // ==================== ARTISTS ====================
