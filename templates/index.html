@@ -7,6 +7,68 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* ===== PLAYLIST STYLES ===== */
+        .playlist-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .playlist-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .playlist-card h3 {
+            color: var(--text);
+            margin: 0 0 8px 0;
+            font-size: 16px;
+        }
+        .playlist-card p {
+            color: var(--text2);
+            font-size: 13px;
+            margin: 0 0 12px 0;
+        }
+        .playlist-card .shot-count {
+            color: var(--text3);
+            font-size: 12px;
+        }
+        .shot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .shot-grid-item {
+            background: var(--elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            text-align: center;
+        }
+        .shot-grid-item .thumbnail-placeholder {
+            width: 100%;
+            height: 120px;
+            background: var(--bg);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: var(--text3);
+        }
+        .shot-grid-item .name {
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .shot-grid-item .status {
+            font-size: 11px;
+            margin-top: 4px;
+        }
         .seq-filter-btn {
             display: inline-block;
             padding: 6px 14px;
@@ -66,6 +128,24 @@
             color: var(--text);
             min-width: 100px;
         }
+        .playlist-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .playlist-detail-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #ef4444;
+        }
     </style>
 </head>
 <body>
@@ -103,9 +183,6 @@
                     <button class="nav-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">
                         <span class="nav-icon">&#128202;</span> Dashboard
                     </button>
-                    <button class="nav-btn" data-tab="playlists" onclick="window.location.href='/playlists'">
-                        <span class="nav-icon">&#127908;</span> Playlists
-                    </button>
                     <button class="nav-btn" data-tab="sequences" onclick="switchTab('sequences')">
                         <span class="nav-icon">&#127903;</span> Sequences
                     </button>
@@ -120,6 +197,9 @@
                     </button>
                     <button class="nav-btn" data-tab="department" onclick="switchTab('department')">
                         <span class="nav-icon">&#128295;</span> Dept View
+                    </button>
+                    <button class="nav-btn" data-tab="playlists" onclick="switchTab('playlists')">
+                        <span class="nav-icon">&#127908;</span> Playlists
                     </button>
                     <button class="nav-btn" data-tab="reports" onclick="switchTab('reports')">
                         <span class="nav-icon">&#128221;</span> Reports
@@ -366,6 +446,17 @@
                                 <tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px;">Loading shots...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Playlists Tab -->
+                <div class="tab-panel" id="panel-playlists">
+                    <div class="section-header">
+                        <h2>Playlists</h2>
+                        <button class="btn btn-primary" onclick="openCreatePlaylistModal()">+ Create Playlist</button>
+                    </div>
+                    <div id="playlistContent">
+                        <div style="text-align:center;padding:40px;color:var(--text2);">Loading playlists...</div>
                     </div>
                 </div>
 
@@ -771,6 +862,55 @@
         </div>
     </div>
 
+    <!-- Playlist Create Modal -->
+    <div class="modal-overlay" id="createPlaylistModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Create Playlist</h2>
+                <button class="modal-close" onclick="closeModal('createPlaylistModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Playlist Name *</label>
+                    <input type="text" id="playlistName" placeholder="e.g., Dailies - June 15" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="playlistDesc" rows="2" placeholder="What's this playlist for?" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Add Shots (optional)</label>
+                    <div id="playlistShotSelector" style="max-height:200px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;">
+                        <span style="color:var(--text3);font-size:13px;">Loading shots...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('createPlaylistModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="savePlaylist()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Shots to Playlist Modal -->
+    <div class="modal-overlay" id="addShotsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Add Shots to Playlist</h2>
+                <button class="modal-close" onclick="closeModal('addShotsModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="addShotsList" style="max-height:300px;overflow-y:auto;">
+                    <span style="color:var(--text3);">Loading shots...</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('addShotsModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveAddShots()">Add Selected</button>
+            </div>
+        </div>
+    </div>
+
     <script>
     // ==================== STATE ====================
     let shows = [];
@@ -784,6 +924,9 @@
     let editingId = null;
     let editingType = null;
     let selectedSequences = new Set();
+    let playlists = [];
+    let currentPlaylistId = null;
+    let playlistAllShots = [];
 
     const STATUS_COLORS = {
         "Not Started": "#6b7280",
@@ -857,12 +1000,17 @@
         sequences = await seqRes.json();
         shots = await shotRes.json();
         artists = await artRes.json();
+        playlistAllShots = shots;
+
         selectedSequences = new Set();
         sequences.forEach(s => selectedSequences.add(s.id));
         if (shots.some(s => !s.sequence_id)) selectedSequences.add('unassigned');
         renderSequenceFilter();
+
         // Populate sequence dropdowns
         populateSequenceDropdowns();
+        // Load playlists if on that tab
+        if (currentTab === 'playlists') loadPlaylists();
     }
 
     function populateSequenceDropdowns() {
@@ -886,6 +1034,7 @@
         else if (currentTab === 'artists') loadArtists();
         else if (currentTab === 'client_updates') loadClientShots();
         else if (currentTab === 'department') loadDepartmentShots();
+        else if (currentTab === 'playlists') loadPlaylists();
         else if (currentTab === 'reports') loadReports();
     }
 
@@ -904,18 +1053,17 @@
         if (!currentShowId) return;
         const res = await fetch(`/api/shows/${currentShowId}/stats`);
         const stats = await res.json();
-        
+
         document.getElementById('statShots').textContent = stats.shot_count;
         document.getElementById('statSeqs').textContent = stats.seq_count;
         document.getElementById('statArtists').textContent = stats.artist_count;
-        
+
         const total = stats.shot_count;
         const approved = stats.status_counts['Approved'] || 0;
         const omit = stats.status_counts['Omit'] || 0;
         const completion = total > 0 ? Math.round(((approved + omit) / total) * 100) : 0;
         document.getElementById('statCompletion').textContent = completion + '%';
 
-        // Status chart
         const ctx = document.getElementById('statusChart').getContext('2d');
         if (statusChart) statusChart.destroy();
         statusChart = new Chart(ctx, {
@@ -935,7 +1083,6 @@
             }
         });
 
-        // Client chart
         const clientCtx = document.getElementById('clientChart').getContext('2d');
         if (clientChart) clientChart.destroy();
         const clientLabels = Object.keys(stats.client_counts);
@@ -957,7 +1104,6 @@
             }
         });
 
-        // Activity
         const histRes = await fetch(`/api/shows/${currentShowId}/history`);
         const history = await histRes.json();
         const list = document.getElementById('activityList');
@@ -969,7 +1115,6 @@
             </div>
         `).join('');
 
-        // Show info
         const showRes = await fetch(`/api/shows/${currentShowId}`);
         const show = await showRes.json();
         document.getElementById('showInfoGrid').innerHTML = `
@@ -1200,7 +1345,6 @@
         const shot = shots.find(s => s.id === shotId);
         if (shot) shot.client_status = clientStatus;
         renderShotsBySequence();
-        // Refresh client tab if visible
         if (currentTab === 'client_updates') loadClientShots();
     }
 
@@ -1224,33 +1368,30 @@
     // ==================== CLIENT UPDATES ====================
     async function loadClientShots() {
         if (!currentShowId) return;
-        
         const search = document.getElementById('clientSearch')?.value?.toLowerCase() || '';
         const status = document.getElementById('clientFilterStatus')?.value || '';
         const sequence = document.getElementById('clientFilterSequence')?.value || '';
-        
+
         const res = await fetch(`/api/shows/${currentShowId}/client_shots`);
         let clientShots = await res.json();
-        
-        // Update stats
+
         document.getElementById('clientTotal').textContent = clientShots.length;
         document.getElementById('clientApproved').textContent = clientShots.filter(s => s.client_status === 'Approved').length;
         document.getElementById('clientChanges').textContent = clientShots.filter(s => s.client_status === 'Changes Requested').length;
         document.getElementById('clientPending').textContent = clientShots.filter(s => s.client_status === 'Pending').length;
-        
-        // Apply filters
+
         clientShots = clientShots.filter(s => {
             return (!search || s.name.toLowerCase().includes(search)) &&
                    (!status || s.client_status === status) &&
                    (!sequence || String(s.sequence_id) === sequence);
         });
-        
+
         const tbody = document.getElementById('clientTableBody');
         if (clientShots.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px;">No client-visible shots found.</td></tr>';
             return;
         }
-        
+
         tbody.innerHTML = clientShots.map(shot => {
             const seq = sequences.find(s => s.id === shot.sequence_id);
             const clientColor = CLIENT_STATUS_COLORS[shot.client_status] || '#6b7280';
@@ -1270,29 +1411,28 @@
     // ==================== DEPARTMENT VIEW ====================
     async function loadDepartmentShots() {
         if (!currentShowId) return;
-        
         const dept = document.getElementById('deptSelect')?.value || 'Compositing';
         const seqFilter = document.getElementById('deptSeqFilter')?.value || '';
         const statusFilter = document.getElementById('deptStatusFilter')?.value || '';
         const search = document.getElementById('deptSearch')?.value?.toLowerCase() || '';
-        
+
         document.getElementById('deptTitle').textContent = `${dept} Department`;
-        
+
         const res = await fetch(`/api/department/${dept}/shots?show_id=${currentShowId}`);
         let deptShots = await res.json();
-        
+
         deptShots = deptShots.filter(s => {
             return (!search || s.name.toLowerCase().includes(search)) &&
                    (!seqFilter || String(s.sequence_id) === seqFilter) &&
                    (!statusFilter || s.status === statusFilter);
         });
-        
+
         const tbody = document.getElementById('deptTableBody');
         if (deptShots.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px;">No shots found for this department.</td></tr>';
             return;
         }
-        
+
         tbody.innerHTML = deptShots.map(shot => {
             const seq = sequences.find(s => s.id === shot.sequence_id);
             const statusColor = STATUS_BG_COLORS[shot.status] || STATUS_BG_COLORS['Not Started'];
@@ -1307,6 +1447,172 @@
                 <td><span style="color:${clientColor};font-weight:500;">${shot.client_status}</span></td>
             </tr>`;
         }).join('');
+    }
+
+    // ==================== PLAYLISTS ====================
+    async function loadPlaylists() {
+        if (!currentShowId) return;
+        const res = await fetch(`/api/shows/${currentShowId}/playlists`);
+        playlists = await res.json();
+        renderPlaylists();
+    }
+
+    function renderPlaylists() {
+        const container = document.getElementById('playlistContent');
+        if (!container) return;
+
+        if (playlists.length === 0) {
+            container.innerHTML = `
+                <div style="text-align:center;padding:60px 20px;color:var(--text2);">
+                    <div style="font-size:48px;margin-bottom:16px;">&#127908;</div>
+                    <h3 style="color:var(--text);">No Playlists Yet</h3>
+                    <p>Create a playlist to group shots for review sessions.</p>
+                    <button class="btn btn-primary" onclick="openCreatePlaylistModal()">+ Create Playlist</button>
+                </div>
+            `;
+            return;
+        }
+
+        let html = `<div class="playlist-grid">`;
+        playlists.forEach(p => {
+            const shotCount = p.shot_ids ? p.shot_ids.length : 0;
+            html += `
+                <div class="playlist-card" onclick="openPlaylistDetail(${p.id})">
+                    <h3>${p.name}</h3>
+                    <p>${p.description || 'No description'}</p>
+                    <span class="shot-count">${shotCount} shots</span>
+                </div>
+            `;
+        });
+        html += `</div>`;
+        container.innerHTML = html;
+    }
+
+    async function openPlaylistDetail(id) {
+        currentPlaylistId = id;
+        const playlist = playlists.find(p => p.id === id);
+        if (!playlist) return;
+
+        const shotIds = playlist.shot_ids || [];
+        const playlistShots = shots.filter(s => shotIds.includes(s.id));
+
+        const container = document.getElementById('playlistContent');
+        container.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                <div>
+                    <h2 style="color:var(--text);margin:0;">${playlist.name}</h2>
+                    <p style="color:var(--text2);margin:4px 0 0 0;">${playlist.description || 'No description'}</p>
+                </div>
+                <div class="playlist-detail-actions">
+                    <button class="btn btn-secondary" onclick="loadPlaylists()">&#8592; Back</button>
+                    <button class="btn btn-primary" onclick="openAddShotsModal()">+ Add Shots</button>
+                    <button class="btn btn-danger" onclick="deletePlaylistDetail()">Delete</button>
+                </div>
+            </div>
+            <div class="shot-grid">
+                ${playlistShots.length === 0 ? '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text2);">No shots in this playlist.</div>' :
+                playlistShots.map(s => `
+                    <div class="shot-grid-item">
+                        <div class="thumbnail-placeholder">&#128247;</div>
+                        <div class="name">${s.name}</div>
+                        <div class="status" style="color:${STATUS_COLORS[s.status] || '#6b7280'};">${s.status}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function openCreatePlaylistModal() {
+        document.getElementById('playlistName').value = '';
+        document.getElementById('playlistDesc').value = '';
+        // Populate shot selector
+        const container = document.getElementById('playlistShotSelector');
+        if (container) {
+            container.innerHTML = shots.map(s => `
+                <label style="display:block;padding:4px 0;cursor:pointer;color:var(--text);font-size:13px;">
+                    <input type="checkbox" value="${s.id}" class="playlist-shot-checkbox"> ${s.name}
+                </label>
+            `).join('');
+        }
+        openModal('createPlaylistModal');
+    }
+
+    async function savePlaylist() {
+        const name = document.getElementById('playlistName').value.trim();
+        const description = document.getElementById('playlistDesc').value.trim();
+        if (!name) { alert('Playlist name is required'); return; }
+
+        const selected = [];
+        document.querySelectorAll('.playlist-shot-checkbox:checked').forEach(cb => {
+            selected.push(parseInt(cb.value));
+        });
+
+        const res = await fetch(`/api/shows/${currentShowId}/playlists`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, description, shot_ids: selected})
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeModal('createPlaylistModal');
+            await loadPlaylists();
+        }
+    }
+
+    function openAddShotsModal() {
+        if (!currentPlaylistId) return;
+        const playlist = playlists.find(p => p.id === currentPlaylistId);
+        const existingIds = playlist?.shot_ids || [];
+
+        const container = document.getElementById('addShotsList');
+        if (container) {
+            container.innerHTML = shots.map(s => `
+                <label style="display:block;padding:4px 0;cursor:pointer;color:var(--text);font-size:13px;">
+                    <input type="checkbox" value="${s.id}" ${existingIds.includes(s.id) ? 'checked' : ''} class="add-shot-checkbox"> ${s.name}
+                </label>
+            `).join('');
+        }
+        openModal('addShotsModal');
+    }
+
+    async function saveAddShots() {
+        const selected = [];
+        document.querySelectorAll('.add-shot-checkbox:checked').forEach(cb => {
+            selected.push(parseInt(cb.value));
+        });
+
+        const playlist = playlists.find(p => p.id === currentPlaylistId);
+        if (!playlist) return;
+
+        await fetch(`/api/playlists/${currentPlaylistId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name: playlist.name,
+                description: playlist.description,
+                shot_ids: selected
+            })
+        });
+        closeModal('addShotsModal');
+        await loadPlaylists();
+        openPlaylistDetail(currentPlaylistId);
+    }
+
+    async function deletePlaylistDetail() {
+        if (!currentPlaylistId) return;
+        const password = prompt("Enter deletion password:");
+        if (!password) return;
+        if (!confirm('Delete this playlist?')) return;
+
+        const res = await fetch(`/api/playlists/${currentPlaylistId}`, {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password})
+        });
+        const data = await res.json();
+        if (data.error) { alert(data.error); return; }
+        await loadPlaylists();
+        currentPlaylistId = null;
     }
 
     // ==================== REPORTS ====================
