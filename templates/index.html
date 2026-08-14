@@ -7,12 +7,137 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* ===== KANBAN STYLES (inside app) ===== */
+        .seq-filter-btn {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text2);
+            transition: all 0.15s;
+            user-select: none;
+        }
+        .seq-filter-btn.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+        .seq-filter-btn:hover {
+            background: var(--elevated);
+        }
+        .seq-filter-btn.active:hover {
+            background: #3b82f6;
+        }
+        .filter-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .filter-actions button {
+            background: var(--elevated);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .filter-actions button:hover {
+            background: var(--border);
+        }
+        .seq-filter-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 0;
+        }
+        .client-status-select {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 4px 10px;
+            font-weight: 600;
+            font-size: 11px;
+            cursor: pointer;
+            color: var(--text);
+            min-width: 100px;
+        }
+        .playlist-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .playlist-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .playlist-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .playlist-card h3 {
+            color: var(--text);
+            margin: 0 0 8px 0;
+            font-size: 16px;
+        }
+        .playlist-card p {
+            color: var(--text2);
+            font-size: 13px;
+            margin: 0 0 12px 0;
+        }
+        .playlist-card .shot-count {
+            color: var(--text3);
+            font-size: 12px;
+        }
+        .shot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .shot-grid-item {
+            background: var(--elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            text-align: center;
+        }
+        .shot-grid-item .thumbnail-placeholder {
+            width: 100%;
+            height: 120px;
+            background: var(--bg);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: var(--text3);
+        }
+        .shot-grid-item .name {
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .shot-grid-item .status {
+            font-size: 11px;
+            margin-top: 4px;
+        }
         .kanban-board-container {
             display: flex;
             flex-direction: column;
             height: 100%;
-            padding: 10px 0;
+            padding: 4px 0;
         }
         .kanban-filters {
             display: flex;
@@ -21,8 +146,7 @@
             flex-wrap: wrap;
             align-items: center;
         }
-        .kanban-filters select,
-        .kanban-filters input {
+        .kanban-filters select {
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
@@ -31,8 +155,7 @@
             font-size: 13px;
             min-width: 140px;
         }
-        .kanban-filters select:focus,
-        .kanban-filters input:focus {
+        .kanban-filters select:focus {
             outline: none;
             border-color: var(--accent);
         }
@@ -46,14 +169,14 @@
             min-height: 400px;
         }
         .kanban-column {
-            min-width: 260px;
-            max-width: 300px;
+            min-width: 270px;
+            max-width: 320px;
             flex: 1;
             background: var(--surface);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 12px;
+            padding: 14px;
             display: flex;
             flex-direction: column;
             max-height: 600px;
@@ -61,13 +184,13 @@
         }
         .kanban-column:hover {
             border-color: var(--accent);
-            box-shadow: 0 4px 24px rgba(96, 165, 250, 0.1);
+            box-shadow: 0 4px 32px rgba(96, 165, 250, 0.08);
         }
         .kanban-column-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 4px 12px 4px;
+            padding: 6px 4px 12px 4px;
             border-bottom: 2px solid var(--border);
             margin-bottom: 12px;
             flex-shrink: 0;
@@ -82,18 +205,18 @@
             background: var(--elevated);
             color: var(--text2);
             font-size: 12px;
-            padding: 2px 10px;
-            border-radius: 12px;
+            padding: 2px 12px;
+            border-radius: 16px;
             font-weight: 500;
         }
         .kanban-column-body {
             flex: 1;
             overflow-y: auto;
             min-height: 100px;
-            padding: 2px;
+            padding: 4px;
         }
         .kanban-column-body.drag-over {
-            background: rgba(96, 165, 250, 0.05);
+            background: rgba(96, 165, 250, 0.06);
             border: 2px dashed var(--accent);
             border-radius: var(--radius-sm);
         }
@@ -101,16 +224,16 @@
             background: var(--elevated);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
-            padding: 12px;
+            padding: 14px;
             margin-bottom: 10px;
             cursor: grab;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
         }
         .kanban-card:hover {
-            transform: translateY(-2px);
+            transform: translateY(-3px);
             border-color: var(--accent);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
         .kanban-card:active {
             cursor: grabbing;
@@ -136,22 +259,21 @@
             font-size: 10px;
             color: var(--text3);
             background: var(--bg);
-            padding: 2px 8px;
+            padding: 2px 10px;
             border-radius: 10px;
         }
         .kanban-card .card-thumbnail {
             width: 100%;
             height: 70px;
-            border-radius: 4px;
+            border-radius: 6px;
             background: var(--bg);
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
+            font-size: 24px;
             color: var(--text3);
             overflow: hidden;
-            object-fit: cover;
         }
         .kanban-card .card-thumbnail img {
             width: 100%;
@@ -166,20 +288,21 @@
         }
         .kanban-card .card-meta .tag {
             font-size: 10px;
-            padding: 2px 8px;
+            padding: 2px 10px;
             border-radius: 10px;
             background: var(--bg);
             color: var(--text2);
         }
         .kanban-card .deadline-badge {
             font-size: 10px;
-            padding: 2px 8px;
+            padding: 2px 10px;
             border-radius: 10px;
             font-weight: 600;
         }
         .kanban-card .bid-used {
             font-size: 10px;
-            color: var(--text2);
+            padding: 2px 8px;
+            border-radius: 8px;
         }
         .kanban-card .card-progress {
             margin-top: 8px;
@@ -192,7 +315,7 @@
             height: 100%;
             border-radius: 2px;
             transition: width 0.5s ease;
-            background: var(--accent);
+            background: linear-gradient(90deg, var(--accent), var(--purple));
         }
         .kanban-card .card-progress .bar.done {
             background: var(--success);
@@ -208,34 +331,43 @@
             border: 2px dashed var(--border);
             border-radius: var(--radius-sm);
         }
-        @keyframes cardAppear {
-            from { opacity: 0; transform: translateY(10px) scale(0.95); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .kanban-card {
-            animation: cardAppear 0.3s ease;
-        }
-        /* ===== DEADLINE COLORS ===== */
         .deadline-critical { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: #ef4444; }
         .deadline-warning { background: rgba(251, 146, 60, 0.15); color: #fb923c; border-color: #fb923c; }
         .deadline-attention { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border-color: #fbbf24; }
         .deadline-good { background: rgba(74, 222, 128, 0.15); color: #4ade80; border-color: #4ade80; }
-        .deadline-overdue { background: rgba(239, 68, 68, 0.3); color: #ef4444; border-color: #ef4444; font-weight: bold; }
-        /* ===== BID vs USED ===== */
-        .bid-over { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        .bid-ok { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
-        .bid-warning { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
-        /* ===== RESPONSIVE ===== */
-        @media (max-width: 768px) {
-            .kanban-board {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .kanban-column {
-                min-width: 100%;
-                max-width: 100%;
-                max-height: 400px;
-            }
+        .deadline-overdue { background: rgba(239, 68, 68, 0.25); color: #ef4444; border-color: #ef4444; font-weight: bold; }
+        .bid-over { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+        .bid-ok { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
+        .bid-warning { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+        .playlist-detail-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #ef4444;
+        }
+        .client-status-select {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 4px 10px;
+            font-weight: 600;
+            font-size: 11px;
+            cursor: pointer;
+            color: var(--text);
+            min-width: 100px;
+        }
+        .client-status-select option {
+            background: #12182a !important;
+            color: #e8edf5 !important;
+        }
+        .client-status-select option:hover {
+            background: #1a2038 !important;
         }
     </style>
 </head>
@@ -377,6 +509,7 @@
                         <div class="filter-actions">
                             <button onclick="selectAllSequences()">Select All</button>
                             <button onclick="deselectAllSequences()">Deselect All</button>
+                            <button onclick="clearAllFilters()" style="background:var(--danger);color:#fff;border-color:var(--danger);">Clear All Filters</button>
                         </div>
                     </div>
                     <!-- Filters -->
@@ -1058,7 +1191,8 @@
     let selectedSequences = new Set();
     let playlists = [];
     let currentPlaylistId = null;
-    let playlistAllShots = [];
+    let sortColumn = 'name';
+    let sortDirection = 'asc';
 
     const STATUS_COLORS = {
         "Not Started": "#6b7280",
@@ -1099,7 +1233,6 @@
         if (shows.length > 0 && !currentShowId) {
             selectShow(shows[0].id);
         }
-        // Force select the first show if none selected
         if (shows.length > 0 && currentShowId === null) {
             selectShow(shows[0].id);
         }
@@ -1144,9 +1277,7 @@
         renderSequenceFilter();
 
         populateSequenceDropdowns();
-        // Load Kanban if that tab is active
         if (currentTab === 'kanban') loadKanban();
-        // Load playlists if on that tab
         if (currentTab === 'playlists') loadPlaylists();
     }
 
@@ -1340,7 +1471,9 @@
     function selectAllSequences() {
         selectedSequences = new Set();
         sequences.forEach(s => selectedSequences.add(s.id));
-        if (shots.some(s => !s.sequence_id)) selectedSequences.add('unassigned');
+        const existingSeqIds = new Set(sequences.map(s => s.id));
+        const hasOrphaned = shots.some(s => !s.sequence_id || !existingSeqIds.has(s.sequence_id));
+        if (hasOrphaned) selectedSequences.add('unassigned');
         renderSequenceFilter();
         renderShotsBySequence();
     }
@@ -1350,8 +1483,18 @@
         renderSequenceFilter();
         renderShotsBySequence();
     }
+    function clearAllFilters() {
+        selectAllSequences();
+        document.getElementById('shotSearch').value = '';
+        document.getElementById('filterStatus').value = '';
+        document.getElementById('filterPriority').value = '';
+        document.getElementById('filterArtist').value = '';
+        document.getElementById('filterDepartment').value = '';
+        renderShotsBySequence();
+    }
 
     // ==================== RENDER SHOTS BY SEQUENCE ====================
+    // FIX: Client status does NOT filter shots – all shots appear regardless of client_status
     function renderShotsBySequence() {
         const container = document.getElementById('shotsContainer');
         const search = document.getElementById('shotSearch').value.toLowerCase();
@@ -1367,24 +1510,72 @@
 
         let filteredShots = shots.filter(s => {
             return (!search || s.name.toLowerCase().includes(search)) &&
-                   (!status || s.status === status) &&
-                   (!priority || s.priority === priority) &&
-                   (!artist || s.assigned_to === artist) &&
-                   (!department || (s.department || '').split(',').includes(department));
+                (!status || s.status === status) &&
+                (!priority || s.priority === priority) &&
+                (!artist || s.assigned_to === artist) &&
+                (!department || (s.department || '').split(',').includes(department));
+        });
+
+        // SORTING
+        filteredShots.sort((a, b) => {
+            let valA, valB;
+            switch(sortColumn) {
+                case 'name':
+                    valA = a.name.toLowerCase();
+                    valB = b.name.toLowerCase();
+                    break;
+                case 'status':
+                    valA = a.status;
+                    valB = b.status;
+                    break;
+                case 'priority':
+                    const priorityOrder = { 'Low': 0, 'Normal': 1, 'High': 2, 'Critical': 3 };
+                    valA = priorityOrder[a.priority] || 0;
+                    valB = priorityOrder[b.priority] || 0;
+                    break;
+                case 'artist':
+                    valA = (a.assigned_to || '').toLowerCase();
+                    valB = (b.assigned_to || '').toLowerCase();
+                    break;
+                case 'department':
+                    valA = (a.department || '').toLowerCase();
+                    valB = (b.department || '').toLowerCase();
+                    break;
+                case 'client_status':
+                    const clientOrder = { 'Not Sent': 0, 'Pending': 1, 'Approved': 2, 'Changes Requested': 3, 'Retake': 4 };
+                    valA = clientOrder[a.client_status] || 0;
+                    valB = clientOrder[b.client_status] || 0;
+                    break;
+                case 'deadline':
+                    valA = a.deadline ? new Date(a.deadline).getTime() : 0;
+                    valB = b.deadline ? new Date(b.deadline).getTime() : 0;
+                    break;
+                case 'bid_used':
+                    valA = a.used_days || 0;
+                    valB = b.used_days || 0;
+                    break;
+                default:
+                    valA = a.name.toLowerCase();
+                    valB = b.name.toLowerCase();
+            }
+            if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+            if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
         });
 
         const seqGroups = {};
+        const existingSeqIds = new Set(sequences.map(s => s.id));
         sequences.forEach(seq => {
             seqGroups[seq.id] = {
                 name: seq.name,
                 shots: filteredShots.filter(s => s.sequence_id === seq.id)
             };
         });
-        const unassignedShots = filteredShots.filter(s => !s.sequence_id);
-        if (unassignedShots.length > 0) {
+        const orphanedShots = filteredShots.filter(s => !s.sequence_id || !existingSeqIds.has(s.sequence_id));
+        if (orphanedShots.length > 0) {
             seqGroups['unassigned'] = {
-                name: 'Unassigned',
-                shots: unassignedShots
+                name: 'Unassigned / Orphaned',
+                shots: orphanedShots
             };
         }
 
@@ -1402,17 +1593,17 @@
             html += `<div class="table-container" style="border-radius:0;">`;
             html += `<table class="data-table">`;
             html += `<thead><tr>
-                <th>Shot Name</th>
+                <th style="cursor:pointer;user-select:none;" onclick="sortShots('name')">Shot Name ${sortColumn === 'name' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
                 <th>Type</th>
                 <th>Frames</th>
                 <th>Duration</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Assigned To</th>
-                <th>Department</th>
-                <th>Client Status</th>
-                <th>Bid / Used</th>
-                <th>Deadline</th>
+                <th style="cursor:pointer;user-select:none;" onclick="sortShots('status')">Status ${sortColumn === 'status' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                <th style="cursor:pointer;user-select:none;" onclick="sortShots('priority')">Priority ${sortColumn === 'priority' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                <th style="cursor:pointer;user-select:none;" onclick="sortShots('artist')">Assigned To ${sortColumn === 'artist' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                <th style="cursor:pointer;user-select:none;" onclick="sortShots('department')">Department ${sortColumn === 'department' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                <th style="cursor:pointer;user-select:none;" onclick="sortShots('client_status')">Client Status ${sortColumn === 'client_status' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                <th style="cursor:pointer;user-select:none;" onclick="sortShots('bid_used')">Bid / Used ${sortColumn === 'bid_used' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                <th style="cursor:pointer;user-select:none;" onclick="sortShots('deadline')">Deadline ${sortColumn === 'deadline' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
                 <th>Actions</th>
             </tr></thead><tbody>`;
 
@@ -1420,9 +1611,7 @@
                 const statusColor = STATUS_BG_COLORS[shot.status] || STATUS_BG_COLORS['Not Started'];
                 const statusTextColor = STATUS_COLORS[shot.status] || STATUS_COLORS['Not Started'];
                 const clientColor = CLIENT_STATUS_COLORS[shot.client_status] || '#6b7280';
-                // Deadline info
                 let deadlineHtml = '-';
-                let deadlineClass = '';
                 if (shot.deadline) {
                     const now = new Date();
                     const deadlineDate = new Date(shot.deadline);
@@ -1433,7 +1622,6 @@
                     else if (diff < 30) { deadlineHtml = `<span class="deadline-attention">${diff}d</span>`; }
                     else { deadlineHtml = `<span class="deadline-good">${diff}d</span>`; }
                 }
-                // Bid vs Used
                 let bidUsedHtml = '-';
                 if (shot.bid_days !== undefined && shot.used_days !== undefined) {
                     const bid = shot.bid_days || 0;
@@ -1491,7 +1679,6 @@
         }
         container.innerHTML = html;
     }
-
     async function updateShotStatus(shotId, status) {
         await fetch(`/api/shots/${shotId}/status`, {
             method: 'PATCH',
@@ -1502,7 +1689,15 @@
         if (shot) shot.status = status;
         renderShotsBySequence();
     }
-
+    function sortShots(column) {
+        if (sortColumn === column) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortColumn = column;
+            sortDirection = 'asc';
+        }
+        renderShotsBySequence();
+    }
     async function updateClientStatus(shotId, clientStatus) {
         await fetch(`/api/shots/${shotId}/client_status`, {
             method: 'PATCH',
@@ -1568,11 +1763,50 @@
                 <td><strong>${shot.name}</strong></td>
                 <td>${seq ? seq.name : '-'}</td>
                 <td><span class="status-badge" style="background:${statusColor};color:${statusTextColor}">${shot.status}</span></td>
-                <td><span style="color:${clientColor};font-weight:600;">${shot.client_status}</span></td>
-                <td>${shot.client_notes || '-'}</td>
+                <td>
+                    <select class="client-status-select" 
+                            style="background:${clientColor}20;color:${clientColor};border:1px solid ${clientColor};border-radius:12px;padding:4px 10px;font-weight:600;font-size:11px;cursor:pointer;"
+                            onchange="updateClientStatusFromClientPage(${shot.id}, this.value)">
+                        <option value="Not Sent" ${shot.client_status==='Not Sent'?'selected':''}>Not Sent</option>
+                        <option value="Pending" ${shot.client_status==='Pending'?'selected':''}>Pending</option>
+                        <option value="Approved" ${shot.client_status==='Approved'?'selected':''}>Approved</option>
+                        <option value="Changes Requested" ${shot.client_status==='Changes Requested'?'selected':''}>Changes Requested</option>
+                        <option value="Retake" ${shot.client_status==='Retake'?'selected':''}>Retake</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="text" style="background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 8px;width:150px;font-size:12px;"
+                           placeholder="Add note..." value="${shot.client_notes || ''}"
+                           onchange="updateClientNote(${shot.id}, this.value)">
+                </td>
                 <td style="font-size:12px;color:var(--text3);">${shot.client_sent_date ? formatDate(shot.client_sent_date) : '-'}</td>
             </tr>`;
         }).join('');
+    }
+
+    async function updateClientStatusFromClientPage(shotId, status) {
+        await fetch(`/api/shots/${shotId}/client_status`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({client_status: status})
+        });
+        // Refresh both views
+        loadClientShots();
+        // Also refresh shots list if shots tab is active
+        if (currentTab === 'shots') renderShotsBySequence();
+        // Update local shots array
+        const shot = shots.find(s => s.id === shotId);
+        if (shot) shot.client_status = status;
+    }
+
+    async function updateClientNote(shotId, note) {
+        await fetch(`/api/shots/${shotId}/client_status`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({client_notes: note})
+        });
+        const shot = shots.find(s => s.id === shotId);
+        if (shot) shot.client_notes = note;
     }
 
     // ==================== DEPARTMENT VIEW ====================
@@ -1815,7 +2049,6 @@
                         ${shotsInCol.length === 0 ? `
                             <div class="empty-column">No shots</div>
                         ` : shotsInCol.map(shot => {
-                            // Deadline status for card
                             let deadlineBadge = '';
                             if (shot.deadline_status && shot.deadline_status.status !== 'unknown') {
                                 const d = shot.deadline_status;
@@ -1826,7 +2059,6 @@
                                             d.status === 'good' ? 'deadline-good' : '';
                                 deadlineBadge = `<span class="deadline-badge ${cls}">${d.label}</span>`;
                             }
-                            // Bid vs Used
                             let bidUsedHtml = '';
                             if (shot.bid_days && shot.used_days !== undefined) {
                                 const bid = shot.bid_days || 0;
@@ -1874,7 +2106,6 @@
                 board.appendChild(col);
             });
 
-            // Attach drag events
             attachKanbanDragEvents();
 
         } catch (err) {
@@ -1941,7 +2172,6 @@
 
         if (!shotId || !newStatus) return;
 
-        // Optimistic UI update
         const card = document.querySelector(`.kanban-card[data-id="${shotId}"]`);
         if (card) {
             card.remove();
@@ -1952,7 +2182,6 @@
             newCol.appendChild(card);
             card.dataset.status = newStatus;
 
-            // Update counts
             const countSpan = this.closest('.kanban-column').querySelector('.count');
             if (countSpan) {
                 const current = parseInt(countSpan.textContent) || 0;
@@ -1967,7 +2196,6 @@
             }
         }
 
-        // Save to server
         try {
             const res = await fetch('/api/kanban/move', {
                 method: 'POST',
