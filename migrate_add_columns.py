@@ -2,9 +2,6 @@ import os
 import sys
 import sqlite3
 
-# Run this script locally to add new columns to your SQLite database
-# (This is for local development – Render will auto-create tables)
-
 sqlite_path = os.path.join(os.path.dirname(__file__), 'data', 'shows.db')
 if not os.path.exists(sqlite_path):
     print(f"Error: SQLite file not found at {sqlite_path}")
@@ -14,15 +11,17 @@ conn = sqlite3.connect(sqlite_path)
 cursor = conn.cursor()
 
 # Add columns to shots table
-columns_to_add = [
+columns = [
     ("client_status", "TEXT DEFAULT 'Not Sent'"),
     ("client_notes", "TEXT"),
     ("client_sent_date", "TEXT"),
     ("client_approved_date", "TEXT"),
-    ("department", "TEXT")
+    ("department", "TEXT"),
+    ("thumbnail", "TEXT"),
+    ("tasks", "TEXT")
 ]
 
-for col_name, col_type in columns_to_add:
+for col_name, col_type in columns:
     try:
         cursor.execute(f"ALTER TABLE shots ADD COLUMN {col_name} {col_type}")
         print(f"Added column '{col_name}' to shots table")
@@ -44,4 +43,4 @@ except sqlite3.OperationalError as e:
 
 conn.commit()
 conn.close()
-print("Migration completed!")
+print("Local SQLite migration completed!")

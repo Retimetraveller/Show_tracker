@@ -156,6 +156,10 @@ def get_show_stats(show_id):
     shots = Shot.query.filter_by(show_id=show_id).all()
     sequences = Sequence.query.filter_by(show_id=show_id).all()
     artists = Artist.query.filter_by(show_id=show_id).all()
+    
+    # Debug: print counts to terminal
+    print(f"DEBUG: show_id={show_id}, shots={len(shots)}, artists={len(artists)}")
+    
     counts = {s: 0 for s in STATUSES}
     client_counts = {s: 0 for s in CLIENT_STATUSES}
     for shot in shots:
@@ -428,14 +432,24 @@ def delete_artist(artist_id):
 def get_shots(show_id):
     shots = Shot.query.filter_by(show_id=show_id).all()
     return jsonify([{
-        "id": s.id, "sequence_id": s.sequence_id, "name": s.name,
-        "description": s.description, "shot_type": s.shot_type,
-        "frames": s.frames, "duration": s.duration, "status": s.status,
-        "priority": s.priority, "assigned_to": s.assigned_to, "notes": s.notes,
-        "created_at": s.created_at, "updated_at": s.updated_at,
-        "client_status": s.client_status, "client_notes": s.client_notes,
-        "client_sent_date": s.client_sent_date, "client_approved_date": s.client_approved_date,
-        "department": s.department, "thumbnail": s.thumbnail, "tasks": s.tasks
+        "id": s.id,
+        "sequence_id": s.sequence_id,
+        "name": s.name,
+        "description": s.description,
+        "shot_type": s.shot_type,
+        "frames": s.frames,
+        "duration": s.duration,
+        "status": s.status,
+        "priority": s.priority,
+        "assigned_to": s.assigned_to,
+        "notes": s.notes,
+        "created_at": s.created_at,
+        "updated_at": s.updated_at,
+        "client_status": s.client_status,
+        "client_notes": s.client_notes,
+        "client_sent_date": s.client_sent_date,
+        "client_approved_date": s.client_approved_date,
+        "department": s.department
     } for s in shots])
 
 @app.route('/api/shows/<int:show_id>/shots', methods=['POST'])
@@ -711,7 +725,6 @@ def export_artists(show_id):
         as_attachment=True,
         download_name=f"{show.name}_artists.csv"
     )
-    @app.route('/debug/shots/<int:show_id>')
 
 # =============================================================================
 # INIT - CREATE TABLES ON STARTUP
@@ -719,6 +732,6 @@ def export_artists(show_id):
 
 with app.app_context():
     db.create_all()
-
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

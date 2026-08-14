@@ -967,6 +967,10 @@
         if (shows.length > 0 && !currentShowId) {
             selectShow(shows[0].id);
         }
+        // FORCE SELECT SHOW IF NOT SELECTED
+        if (shows.length > 0) {
+            selectShow(shows[0].id);
+        }
     }
 
     function renderShowTabs() {
