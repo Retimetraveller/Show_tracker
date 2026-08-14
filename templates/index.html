@@ -72,6 +72,8 @@
             </div>
             <div class="header-actions">
                 <a href="/artist_view" class="btn btn-secondary" target="_blank">&#128100; Artist View</a>
+                <a href="/client_updates" class="btn btn-secondary">&#128196; Client Updates</a>
+                <a href="/department/Compositing" class="btn btn-secondary">&#128295; Dept View</a>
                 <button class="btn btn-primary" onclick="openAddShowModal()">+ Add Show</button>
             </div>
         </header>
@@ -177,18 +179,16 @@
                             <button class="btn btn-secondary" onclick="openAddShotModal()">+ Add Single</button>
                         </div>
                     </div>
-                    <!-- Sequence Filter (new) -->
+                    <!-- Sequence Filter -->
                     <div class="filters-bar" style="flex-wrap:wrap;gap:8px;align-items:center;">
                         <span style="font-size:13px;color:var(--text2);">Filter by Sequence:</span>
-                        <div id="sequenceFilterContainer" class="seq-filter-container">
-                            <!-- checkboxes will be rendered here -->
-                        </div>
+                        <div id="sequenceFilterContainer" class="seq-filter-container"></div>
                         <div class="filter-actions">
                             <button onclick="selectAllSequences()">Select All</button>
                             <button onclick="deselectAllSequences()">Deselect All</button>
                         </div>
                     </div>
-                    <!-- Existing filters -->
+                    <!-- Existing filters + Department dropdown -->
                     <div class="filters-bar">
                         <input type="text" class="filter-input" id="shotSearch" placeholder="Search shots..." oninput="filterShots()">
                         <select class="filter-select" id="filterStatus" onchange="filterShots()">
@@ -209,6 +209,21 @@
                         </select>
                         <select class="filter-select" id="filterArtist" onchange="filterShots()">
                             <option value="">All Artists</option>
+                        </select>
+                        <select class="filter-select" id="filterDepartment" onchange="filterShots()">
+                            <option value="">All Departments</option>
+                            <option>Animation</option>
+                            <option>Modeling</option>
+                            <option>Layout</option>
+                            <option>Matchmove</option>
+                            <option>Roto</option>
+                            <option>Paint</option>
+                            <option>CFX</option>
+                            <option>Groom</option>
+                            <option>RotoAnim</option>
+                            <option>Lighting</option>
+                            <option>Compositing</option>
+                            <option>FX</option>
                         </select>
                     </div>
                     <div id="shotsContainer">
@@ -436,6 +451,24 @@
                         <label>Assigned To</label>
                         <select id="shotAssigned"></select>
                     </div>
+                    <div class="form-group">
+                        <label>Department</label>
+                        <select id="shotDepartment">
+                            <option value="">Select Department</option>
+                            <option>Animation</option>
+                            <option>Modeling</option>
+                            <option>Layout</option>
+                            <option>Matchmove</option>
+                            <option>Roto</option>
+                            <option>Paint</option>
+                            <option>CFX</option>
+                            <option>Groom</option>
+                            <option>RotoAnim</option>
+                            <option>Lighting</option>
+                            <option>Compositing</option>
+                            <option>FX</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group full-width">
                     <label>Description</label>
@@ -515,6 +548,24 @@
                     <div class="form-group">
                         <label>Assigned To</label>
                         <select id="bulkAssigned"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Department</label>
+                        <select id="bulkDepartment">
+                            <option value="">Select Department</option>
+                            <option>Animation</option>
+                            <option>Modeling</option>
+                            <option>Layout</option>
+                            <option>Matchmove</option>
+                            <option>Roto</option>
+                            <option>Paint</option>
+                            <option>CFX</option>
+                            <option>Groom</option>
+                            <option>RotoAnim</option>
+                            <option>Lighting</option>
+                            <option>Compositing</option>
+                            <option>FX</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Frames</label>
@@ -604,7 +655,7 @@
     let statusChart = null;
     let editingId = null;
     let editingType = null;
-    let selectedSequences = new Set(); // stores sequence IDs (numbers) or 'unassigned'
+    let selectedSequences = new Set();
 
     const STATUS_COLORS = {
         "Not Started": "#6b7280",
@@ -671,10 +722,10 @@
         sequences = await seqRes.json();
         shots = await shotRes.json();
         artists = await artRes.json();
-        // Reset sequence filter when show changes – select all
+        // Reset sequence filter – select all
         selectedSequences = new Set();
         sequences.forEach(s => selectedSequences.add(s.id));
-        selectedSequences.add('unassigned');
+        if (shots.some(s => !s.sequence_id)) selectedSequences.add('unassigned');
         renderSequenceFilter();
     }
 
@@ -803,7 +854,6 @@
         const container = document.getElementById('sequenceFilterContainer');
         if (!container) return;
         let html = '';
-        // Show 'Unassigned' option if there are any unassigned shots
         const hasUnassigned = shots.some(s => !s.sequence_id);
         if (hasUnassigned) {
             const active = selectedSequences.has('unassigned') ? 'active' : '';
@@ -817,18 +867,16 @@
     }
 
     function toggleSequence(seqId) {
-        // Convert to number if it's a sequence ID (not 'unassigned')
         const key = seqId === 'unassigned' ? 'unassigned' : Number(seqId);
-        
         if (selectedSequences.has(key)) {
             selectedSequences.delete(key);
         } else {
             selectedSequences.add(key);
         }
-        
         renderSequenceFilter();
         renderShotsBySequence();
     }
+
     function selectAllSequences() {
         selectedSequences = new Set();
         sequences.forEach(s => selectedSequences.add(s.id));
@@ -850,22 +898,21 @@
         const status = document.getElementById('filterStatus').value;
         const priority = document.getElementById('filterPriority').value;
         const artist = document.getElementById('filterArtist').value;
-        
-        // If no sequences selected, show message
+        const department = document.getElementById('filterDepartment') ? document.getElementById('filterDepartment').value : '';
+
         if (selectedSequences.size === 0) {
             container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text2);">Select at least one sequence to view shots.</div>`;
             return;
         }
-        
-        // Filter shots based on all criteria
+
         let filteredShots = shots.filter(s => {
             return (!search || s.name.toLowerCase().includes(search)) &&
-                (!status || s.status === status) &&
-                (!priority || s.priority === priority) &&
-                (!artist || s.assigned_to === artist);
+                   (!status || s.status === status) &&
+                   (!priority || s.priority === priority) &&
+                   (!artist || s.assigned_to === artist) &&
+                   (!department || s.department === department);
         });
-        
-        // Group by sequence
+
         const seqGroups = {};
         sequences.forEach(seq => {
             seqGroups[seq.id] = {
@@ -873,7 +920,6 @@
                 shots: filteredShots.filter(s => s.sequence_id === seq.id)
             };
         });
-        // Unassigned group
         const unassignedShots = filteredShots.filter(s => !s.sequence_id);
         if (unassignedShots.length > 0) {
             seqGroups['unassigned'] = {
@@ -881,15 +927,13 @@
                 shots: unassignedShots
             };
         }
-        
+
         let html = '';
         for (const [seqId, group] of Object.entries(seqGroups)) {
-            // Convert seqId to number for comparison (except 'unassigned')
             const key = seqId === 'unassigned' ? 'unassigned' : Number(seqId);
-            // Skip if this sequence is not selected in filter
             if (!selectedSequences.has(key)) continue;
             if (group.shots.length === 0) continue;
-            
+
             html += `<div class="sequence-group" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;">`;
             html += `<div class="sequence-header" style="padding:12px 20px;background:var(--elevated);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">`;
             html += `<h3 style="font-size:15px;font-weight:600;color:var(--text);margin:0;">${group.name}</h3>`;
@@ -905,9 +949,10 @@
                 <th>Status</th>
                 <th>Priority</th>
                 <th>Assigned To</th>
+                <th>Department</th>
                 <th>Actions</th>
             </tr></thead><tbody>`;
-            
+
             group.shots.forEach(shot => {
                 const statusColor = STATUS_BG_COLORS[shot.status] || STATUS_BG_COLORS['Not Started'];
                 const statusTextColor = STATUS_COLORS[shot.status] || STATUS_COLORS['Not Started'];
@@ -929,16 +974,17 @@
                     </td>
                     <td><span class="priority-badge priority-${shot.priority.toLowerCase()}">${shot.priority}</span></td>
                     <td>${shot.assigned_to || '-'}</td>
+                    <td>${shot.department || '-'}</td>
                     <td>
                         <button class="btn-icon" onclick="openEditShotModal(${shot.id})">&#9998;</button>
                         <button class="btn-icon btn-danger" onclick="deleteShot(${shot.id})">&#128465;</button>
                     </td>
                 </tr>`;
             });
-            
+
             html += `</tbody></table></div></div>`;
         }
-        
+
         if (!html) {
             html = `<div style="text-align:center;padding:40px;color:var(--text2);">No shots found matching your filters.</div>`;
         }
@@ -1134,6 +1180,7 @@
         document.getElementById('shotPriority').value = 'Normal';
         document.getElementById('shotDescription').value = '';
         document.getElementById('shotNotes').value = '';
+        document.getElementById('shotDepartment').value = '';
         populateShotForm('shot');
         openModal('shotModal');
     }
@@ -1149,6 +1196,7 @@
         document.getElementById('shotPriority').value = shot.priority;
         document.getElementById('shotDescription').value = shot.description || '';
         document.getElementById('shotNotes').value = shot.notes || '';
+        document.getElementById('shotDepartment').value = shot.department || '';
         populateShotForm('shot');
         document.getElementById('shotSequence').value = shot.sequence_id || '';
         document.getElementById('shotType').value = shot.shot_type || '';
@@ -1166,7 +1214,8 @@
             status: document.getElementById('shotStatus').value,
             priority: document.getElementById('shotPriority').value,
             assigned_to: document.getElementById('shotAssigned').value,
-            notes: document.getElementById('shotNotes').value
+            notes: document.getElementById('shotNotes').value,
+            department: document.getElementById('shotDepartment').value
         };
         if (!data.name) { alert('Shot name is required'); return; }
         const url = editingId ? `/api/shots/${editingId}` : `/api/shows/${currentShowId}/shots`;
@@ -1202,6 +1251,7 @@
         document.getElementById('bulkFrames').value = '';
         document.getElementById('bulkDuration').value = '';
         document.getElementById('bulkNotes').value = '';
+        document.getElementById('bulkDepartment').value = '';
         updateBulkPreview();
         openModal('bulkShotModal');
     }
@@ -1238,7 +1288,8 @@
             assigned_to: document.getElementById('bulkAssigned').value,
             frames: document.getElementById('bulkFrames').value,
             duration: document.getElementById('bulkDuration').value,
-            notes: document.getElementById('bulkNotes').value
+            notes: document.getElementById('bulkNotes').value,
+            department: document.getElementById('bulkDepartment').value
         };
         if (!data.pattern || !data.count) { alert('Pattern and count are required'); return; }
         const res = await fetch(`/api/shows/${currentShowId}/shots/bulk`, {

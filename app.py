@@ -5,19 +5,17 @@ import re
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-# v2 - forcing clean build
+import json
+
 app = Flask(__name__)
 
 # ==================== DATABASE CONFIG ====================
-# Use PostgreSQL if DATABASE_URL is set (Render), else SQLite
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
-    # Render uses 'postgres://' but SQLAlchemy wants 'postgresql://'
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 else:
-    # Local SQLite (fallback)
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, 'data')
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -47,6 +45,7 @@ class Show(db.Model):
     notes = db.Column(db.Text)
     status = db.Column(db.String(50), default='Active')
     created_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
+    thumbnail = db.Column(db.String(500))  # NEW – show thumbnail
 
 class Sequence(db.Model):
     __tablename__ = 'sequences'
@@ -84,6 +83,12 @@ class Shot(db.Model):
     notes = db.Column(db.Text)
     created_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
     updated_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
+    # NEW FIELDS
+    client_status = db.Column(db.String(50), default='Not Sent')  # Not Sent, Pending, Approved, Changes Requested
+    client_notes = db.Column(db.Text)
+    client_sent_date = db.Column(db.String(50))
+    client_approved_date = db.Column(db.String(50))
+    department = db.Column(db.String(50))  # Animation, Modeling, CFX, etc.
 
 class History(db.Model):
     __tablename__ = 'history'
@@ -114,10 +119,18 @@ STATUS_BG_COLORS = {
     "Omit": "rgba(136, 136, 136, 0.15)"
 }
 
+CLIENT_STATUS_COLORS = {
+    "Not Sent": "#6b7280",
+    "Pending": "#fbbf24",
+    "Approved": "#4ade80",
+    "Changes Requested": "#f87171"
+}
+
 SHOT_TYPES = ["VFX", "CG", "Cleanup", "Roto", "Matchmove", "Paint", "Compositing", "Full CG", "Element"]
-DEPARTMENTS = ["Compositing", "Lighting", "FX", "Animation", "Roto", "Prep", "Matchmove", "Concept"]
+DEPARTMENTS = ["Animation", "Modeling", "Layout", "Matchmove", "Roto", "Paint", "CFX", "Groom", "RotoAnim", "Lighting", "Compositing", "FX"]
 PRIORITIES = ["Low", "Normal", "High", "Critical"]
 STATUSES = ["Not Started", "WIP", "Review", "Approved", "On Hold", "Omit"]
+CLIENT_STATUSES = ["Not Sent", "Pending", "Approved", "Changes Requested"]
 
 # =============================================================================
 # HELPERS
@@ -133,18 +146,21 @@ def get_show_stats(show_id):
     sequences = Sequence.query.filter_by(show_id=show_id).all()
     artists = Artist.query.filter_by(show_id=show_id).all()
     counts = {s: 0 for s in STATUSES}
+    client_counts = {s: 0 for s in CLIENT_STATUSES}
     for shot in shots:
         if shot.status in counts:
             counts[shot.status] += 1
+        if shot.client_status in client_counts:
+            client_counts[shot.client_status] += 1
     return {
         "shot_count": len(shots),
         "seq_count": len(sequences),
         "artist_count": len(artists),
-        "status_counts": counts
+        "status_counts": counts,
+        "client_counts": client_counts
     }
 
 def parse_shot_pattern(pattern, count):
-    """Parse a shot name pattern and generate numbered variants."""
     matches = list(re.finditer(r'(\d+)', pattern))
     if not matches:
         return [pattern] if count == 1 else []
@@ -173,6 +189,14 @@ def index():
 def artist_view():
     return render_template('artist_view.html')
 
+@app.route('/client_updates')
+def client_updates():
+    return render_template('client_updates.html')
+
+@app.route('/department/<dept_name>')
+def department_view(dept_name):
+    return render_template('department_view.html', department=dept_name)
+
 # =============================================================================
 # API - SHOWS
 # =============================================================================
@@ -186,7 +210,7 @@ def get_shows():
         "start_date": s.start_date, "delivery_date": s.delivery_date,
         "budget": s.budget, "fps": s.fps, "resolution": s.resolution,
         "colorspace": s.colorspace, "notes": s.notes, "status": s.status,
-        "created_at": s.created_at
+        "created_at": s.created_at, "thumbnail": s.thumbnail
     } for s in shows])
 
 @app.route('/api/shows', methods=['POST'])
@@ -205,7 +229,8 @@ def create_show():
         resolution=data.get('resolution', '1920x1080'),
         colorspace=data.get('colorspace', 'ACES'),
         notes=data.get('notes', ''),
-        status=data.get('status', 'Active')
+        status=data.get('status', 'Active'),
+        thumbnail=data.get('thumbnail', '')
     )
     db.session.add(show)
     db.session.commit()
@@ -221,7 +246,8 @@ def get_show(show_id):
         "comp_supervisor": show.comp_supervisor, "start_date": show.start_date,
         "delivery_date": show.delivery_date, "budget": show.budget,
         "fps": show.fps, "resolution": show.resolution,
-        "colorspace": show.colorspace, "notes": show.notes, "status": show.status
+        "colorspace": show.colorspace, "notes": show.notes, "status": show.status,
+        "thumbnail": show.thumbnail
     })
 
 @app.route('/api/shows/<int:show_id>', methods=['PUT'])
@@ -241,12 +267,17 @@ def update_show(show_id):
     show.colorspace = data.get('colorspace', show.colorspace)
     show.notes = data.get('notes', show.notes)
     show.status = data.get('status', show.status)
+    show.thumbnail = data.get('thumbnail', show.thumbnail)
     db.session.commit()
     log_action(show_id, f"Show '{show.name}' updated")
     return jsonify({"success": True})
 
 @app.route('/api/shows/<int:show_id>', methods=['DELETE'])
 def delete_show(show_id):
+    data = request.json
+    password = data.get('password', '')
+    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+        return jsonify({"success": False, "error": "Incorrect password"}), 403
     show = Show.query.get_or_404(show_id)
     name = show.name
     Shot.query.filter_by(show_id=show_id).delete()
@@ -291,6 +322,10 @@ def update_sequence(seq_id):
 
 @app.route('/api/sequences/<int:seq_id>', methods=['DELETE'])
 def delete_sequence(seq_id):
+    data = request.json
+    password = data.get('password', '')
+    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+        return jsonify({"success": False, "error": "Incorrect password"}), 403
     seq = Sequence.query.get_or_404(seq_id)
     show_id = seq.show_id
     name = seq.name
@@ -341,6 +376,10 @@ def update_artist(artist_id):
 
 @app.route('/api/artists/<int:artist_id>', methods=['DELETE'])
 def delete_artist(artist_id):
+    data = request.json
+    password = data.get('password', '')
+    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+        return jsonify({"success": False, "error": "Incorrect password"}), 403
     artist = Artist.query.get_or_404(artist_id)
     show_id = artist.show_id
     name = artist.name
@@ -362,7 +401,10 @@ def get_shots(show_id):
         "description": s.description, "shot_type": s.shot_type,
         "frames": s.frames, "duration": s.duration, "status": s.status,
         "priority": s.priority, "assigned_to": s.assigned_to, "notes": s.notes,
-        "created_at": s.created_at, "updated_at": s.updated_at
+        "created_at": s.created_at, "updated_at": s.updated_at,
+        "client_status": s.client_status, "client_notes": s.client_notes,
+        "client_sent_date": s.client_sent_date, "client_approved_date": s.client_approved_date,
+        "department": s.department
     } for s in shots])
 
 @app.route('/api/shows/<int:show_id>/shots', methods=['POST'])
@@ -374,7 +416,8 @@ def create_shot(show_id):
         shot_type=data.get('shot_type', ''), frames=data.get('frames', ''),
         duration=data.get('duration', ''), status=data.get('status', 'Not Started'),
         priority=data.get('priority', 'Normal'), assigned_to=data.get('assigned_to', ''),
-        notes=data.get('notes', '')
+        notes=data.get('notes', ''), department=data.get('department', ''),
+        client_status=data.get('client_status', 'Not Sent')
     )
     db.session.add(shot)
     db.session.commit()
@@ -394,6 +437,7 @@ def create_shots_bulk(show_id):
     frames = data.get('frames', '')
     duration = data.get('duration', '')
     notes = data.get('notes', '')
+    department = data.get('department', '')
     
     names = parse_shot_pattern(pattern, count)
     created = []
@@ -401,7 +445,8 @@ def create_shots_bulk(show_id):
         shot = Shot(
             show_id=show_id, sequence_id=sequence_id, name=name,
             shot_type=shot_type, status=status, priority=priority,
-            assigned_to=assigned_to, frames=frames, duration=duration, notes=notes
+            assigned_to=assigned_to, frames=frames, duration=duration,
+            notes=notes, department=department, client_status='Not Sent'
         )
         db.session.add(shot)
         created.append(name)
@@ -423,6 +468,7 @@ def update_shot(shot_id):
     shot.priority = data.get('priority', shot.priority)
     shot.assigned_to = data.get('assigned_to', shot.assigned_to)
     shot.notes = data.get('notes', shot.notes)
+    shot.department = data.get('department', shot.department)
     shot.updated_at = datetime.now().isoformat()
     db.session.commit()
     log_action(shot.show_id, f"Shot '{shot.name}' updated")
@@ -430,6 +476,10 @@ def update_shot(shot_id):
 
 @app.route('/api/shots/<int:shot_id>', methods=['DELETE'])
 def delete_shot(shot_id):
+    data = request.json
+    password = data.get('password', '')
+    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+        return jsonify({"success": False, "error": "Incorrect password"}), 403
     shot = Shot.query.get_or_404(shot_id)
     show_id = shot.show_id
     name = shot.name
@@ -447,6 +497,42 @@ def update_shot_status(shot_id):
     db.session.commit()
     return jsonify({"success": True})
 
+@app.route('/api/shots/<int:shot_id>/client_status', methods=['PATCH'])
+def update_client_status(shot_id):
+    shot = Shot.query.get_or_404(shot_id)
+    data = request.json
+    shot.client_status = data.get('client_status', shot.client_status)
+    shot.client_notes = data.get('client_notes', shot.client_notes)
+    if data.get('client_status') == 'Pending':
+        shot.client_sent_date = datetime.now().isoformat()
+    elif data.get('client_status') == 'Approved':
+        shot.client_approved_date = datetime.now().isoformat()
+    shot.updated_at = datetime.now().isoformat()
+    db.session.commit()
+    log_action(shot.show_id, f"Shot '{shot.name}' client status updated to {shot.client_status}")
+    return jsonify({"success": True})
+
+# =============================================================================
+# API - DEPARTMENT VIEW
+# =============================================================================
+
+@app.route('/api/department/<dept_name>/shots')
+def get_department_shots(dept_name):
+    # Get all shots for the current show
+    show_id = request.args.get('show_id', type=int)
+    if not show_id:
+        return jsonify({"error": "show_id required"}), 400
+    
+    shots = Shot.query.filter_by(show_id=show_id, department=dept_name).all()
+    return jsonify([{
+        "id": s.id, "sequence_id": s.sequence_id, "name": s.name,
+        "description": s.description, "shot_type": s.shot_type,
+        "frames": s.frames, "duration": s.duration, "status": s.status,
+        "priority": s.priority, "assigned_to": s.assigned_to, "notes": s.notes,
+        "created_at": s.created_at, "updated_at": s.updated_at,
+        "client_status": s.client_status, "department": s.department
+    } for s in shots])
+
 # =============================================================================
 # API - ARTIST VIEW (cross-show)
 # =============================================================================
@@ -462,7 +548,8 @@ def get_artist_shots(name):
             "id": shot.id, "name": shot.name, "show_name": show.name if show else "",
             "sequence_name": seq.name if seq else "", "status": shot.status,
             "priority": shot.priority, "shot_type": shot.shot_type,
-            "frames": shot.frames, "duration": shot.duration, "notes": shot.notes
+            "frames": shot.frames, "duration": shot.duration, "notes": shot.notes,
+            "client_status": shot.client_status, "department": shot.department
         })
     return jsonify(result)
 
@@ -490,12 +577,13 @@ def export_shots(show_id):
     shots = Shot.query.filter_by(show_id=show_id).all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Shot Name", "Sequence", "Type", "Frames", "Duration", "Status", "Priority", "Assigned To", "Notes"])
+    writer.writerow(["Shot Name", "Sequence", "Type", "Frames", "Duration", "Status", "Priority", "Assigned To", "Client Status", "Department", "Notes"])
     for shot in shots:
         seq = Sequence.query.get(shot.sequence_id) if shot.sequence_id else None
         writer.writerow([
             shot.name, seq.name if seq else "", shot.shot_type, shot.frames,
-            shot.duration, shot.status, shot.priority, shot.assigned_to or "", shot.notes or ""
+            shot.duration, shot.status, shot.priority, shot.assigned_to or "",
+            shot.client_status, shot.department or "", shot.notes or ""
         ])
     output.seek(0)
     return send_file(
@@ -523,10 +611,9 @@ def export_artists(show_id):
     )
 
 # =============================================================================
-# INIT
+# INIT - CREATE TABLES ON STARTUP
 # =============================================================================
 
-# Create tables on startup (for Render)
 with app.app_context():
     db.create_all()
 

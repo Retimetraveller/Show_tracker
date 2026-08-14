@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Updates - VFX Show Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo">
+                <span class="logo-icon">&#128202;</span>
+                <h1>Client Updates</h1>
+            </div>
+            <div class="header-actions">
+                <a href="/" class="btn btn-secondary">&#8592; Back to Tracker</a>
+            </div>
+        </header>
+
+        <div class="main-content" style="padding:20px;">
+            <!-- Stats -->
+            <div class="stats-grid" id="clientStats" style="grid-template-columns: repeat(4, 1fr);">
+                <div class="stat-card"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total Shots</div></div>
+                <div class="stat-card"><div class="stat-value" id="statPending" style="color:#fbbf24;">0</div><div class="stat-label">Pending</div></div>
+                <div class="stat-card"><div class="stat-value" id="statApproved" style="color:#4ade80;">0</div><div class="stat-label">Approved</div></div>
+                <div class="stat-card"><div class="stat-value" id="statChanges" style="color:#f87171;">0</div><div class="stat-label">Changes Requested</div></div>
+            </div>
+
+            <div class="section-header">
+                <h2>All Shots - Client Status</h2>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters-bar">
+                <input type="text" class="filter-input" id="clientSearch" placeholder="Search shots..." oninput="loadClientShots()">
+                <select class="filter-select" id="clientFilterStatus" onchange="loadClientShots()">
+                    <option value="">All Client Status</option>
+                    <option>Not Sent</option>
+                    <option>Pending</option>
+                    <option>Approved</option>
+                    <option>Changes Requested</option>
+                </select>
+                <select class="filter-select" id="clientFilterSequence" onchange="loadClientShots()">
+                    <option value="">All Sequences</option>
+                </select>
+                <select class="filter-select" id="clientFilterPriority" onchange="loadClientShots()">
+                    <option value="">All Priorities</option>
+                    <option>Low</option>
+                    <option>Normal</option>
+                    <option>High</option>
+                    <option>Critical</option>
+                </select>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table" id="clientTable">
+                    <thead>
+                        <tr>
+                            <th>Shot Name</th>
+                            <th>Sequence</th>
+                            <th>Status</th>
+                            <th>Priority</th>
+                            <th>Assigned To</th>
+                            <th>Client Status</th>
+                            <th>Client Notes</th>
+                            <th>Sent Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientTableBody">
+                        <tr><td colspan="9" style="text-align:center;color:var(--text2);padding:40px;">Loading shots...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .main-content { overflow-y: auto; height: calc(100vh - 70px); }
+    </style>
+
+    <script>
+        let currentShowId = null;
+        let allShots = [];
+        let sequences = [];
+
+        const CLIENT_STATUS_COLORS = {
+            "Not Sent": "#6b7280",
+            "Pending": "#fbbf24",
+            "Approved": "#4ade80",
+            "Changes Requested": "#f87171"
+        };
+        const STATUS_COLORS = {
+            "Not Started": "#6b7280",
+            "WIP": "#fbbf24",
+            "Review": "#60a5fa",
+            "Approved": "#4ade80",
+            "On Hold": "#f87171",
+            "Omit": "#888888"
+        };
+        const STATUS_BG_COLORS = {
+            "Not Started": "rgba(107, 114, 128, 0.15)",
+            "WIP": "rgba(251, 191, 36, 0.15)",
+            "Review": "rgba(96, 165, 250, 0.15)",
+            "Approved": "rgba(74, 222, 128, 0.15)",
+            "On Hold": "rgba(248, 113, 113, 0.15)",
+            "Omit": "rgba(136, 136, 136, 0.15)"
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadShows();
+        });
+
+        async function loadShows() {
+            const res = await fetch('/api/shows');
+            const shows = await res.json();
+            if (shows.length > 0) {
+                currentShowId = shows[0].id;
+                await loadClientShots();
+            } else {
+                document.getElementById('clientTableBody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:40px;">No shows found. Create a show first.</td></tr>';
+            }
+        }
+
+        async function loadClientShots() {
+            if (!currentShowId) return;
+
+            // Get sequences
+            const seqRes = await fetch(`/api/shows/${currentShowId}/sequences`);
+            sequences = await seqRes.json();
+
+            // Populate sequence filter
+            const seqFilter = document.getElementById('clientFilterSequence');
+            const currentSeqVal = seqFilter.value;
+            seqFilter.innerHTML = '<option value="">All Sequences</option>';
+            sequences.forEach(s => {
+                seqFilter.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+            });
+            seqFilter.value = currentSeqVal;
+
+            // Get shots
+            const shotRes = await fetch(`/api/shows/${currentShowId}/shots`);
+            allShots = await shotRes.json();
+
+            // Apply filters
+            const search = document.getElementById('clientSearch').value.toLowerCase();
+            const clientStatus = document.getElementById('clientFilterStatus').value;
+            const sequence = document.getElementById('clientFilterSequence').value;
+            const priority = document.getElementById('clientFilterPriority').value;
+
+            let filtered = allShots.filter(s => {
+                return (!search || s.name.toLowerCase().includes(search)) &&
+                       (!clientStatus || s.client_status === clientStatus) &&
+                       (!sequence || String(s.sequence_id) === sequence) &&
+                       (!priority || s.priority === priority);
+            });
+
+            // Update stats
+            document.getElementById('statTotal').textContent = allShots.length;
+            document.getElementById('statPending').textContent = allShots.filter(s => s.client_status === 'Pending').length;
+            document.getElementById('statApproved').textContent = allShots.filter(s => s.client_status === 'Approved').length;
+            document.getElementById('statChanges').textContent = allShots.filter(s => s.client_status === 'Changes Requested').length;
+
+            const tbody = document.getElementById('clientTableBody');
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:40px;">No shots found.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(shot => {
+                const seq = sequences.find(s => s.id === shot.sequence_id);
+                const statusColor = STATUS_BG_COLORS[shot.status] || STATUS_BG_COLORS['Not Started'];
+                const statusTextColor = STATUS_COLORS[shot.status] || STATUS_COLORS['Not Started'];
+                const clientColor = CLIENT_STATUS_COLORS[shot.client_status] || '#6b7280';
+                
+                return `<tr>
+                    <td><strong>${shot.name}</strong></td>
+                    <td>${seq ? seq.name : '-'}</td>
+                    <td><span class="status-badge" style="background:${statusColor};color:${statusTextColor}">${shot.status}</span></td>
+                    <td><span class="priority-badge priority-${shot.priority.toLowerCase()}">${shot.priority}</span></td>
+                    <td>${shot.assigned_to || '-'}</td>
+                    <td>
+                        <select style="background:${clientColor}20;color:${clientColor};border:1px solid ${clientColor};border-radius:12px;padding:4px 10px;font-weight:600;font-size:11px;cursor:pointer;"
+                                onchange="updateClientStatus(${shot.id}, this.value)">
+                            <option value="Not Sent" ${shot.client_status==='Not Sent'?'selected':''}>Not Sent</option>
+                            <option value="Pending" ${shot.client_status==='Pending'?'selected':''}>Pending</option>
+                            <option value="Approved" ${shot.client_status==='Approved'?'selected':''}>Approved</option>
+                            <option value="Changes Requested" ${shot.client_status==='Changes Requested'?'selected':''}>Changes Requested</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input type="text" style="background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 8px;width:150px;font-size:12px;"
+                               placeholder="Add note..." value="${shot.client_notes || ''}"
+                               onchange="updateClientNote(${shot.id}, this.value)">
+                    </td>
+                    <td style="font-size:12px;color:var(--text3);">${shot.client_sent_date ? formatDate(shot.client_sent_date) : '-'}</td>
+                    <td>
+                        <button class="btn-icon" onclick="openEditShotModal(${shot.id})">&#9998;</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function updateClientStatus(shotId, status) {
+            await fetch(`/api/shots/${shotId}/client_status`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({client_status: status})
+            });
+            loadClientShots();
+        }
+
+        async function updateClientNote(shotId, note) {
+            await fetch(`/api/shots/${shotId}/client_status`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({client_notes: note})
+            });
+        }
+
+        async function openEditShotModal(id) {
+            const shot = allShots.find(s => s.id === id);
+            if (!shot) return;
+
+            const newStatus = prompt(`Change internal status for ${shot.name}:\nCurrent: ${shot.status}\nEnter new status (Not Started, WIP, Review, Approved, On Hold, Omit):`);
+            if (newStatus && ['Not Started', 'WIP', 'Review', 'Approved', 'On Hold', 'Omit'].includes(newStatus)) {
+                await fetch(`/api/shots/${id}/status`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({status: newStatus})
+                });
+                loadClientShots();
+            } else if (newStatus) {
+                alert('Invalid status');
+            }
+        }
+
+        function formatDate(iso) {
+            if (!iso) return '-';
+            const d = new Date(iso);
+            return d.toLocaleDateString();
+        }
+    </script>
+</body>
+</html>
