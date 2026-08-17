@@ -6,29 +6,23 @@ import json
 import uuid
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import UniqueConstraint
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
 # ==================== DATABASE CONFIG ====================
-# Get DATABASE_URL from environment, strip whitespace
-DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
-
+DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
-    # Ensure it's a valid SQLAlchemy URL
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
-    print(f"Using PostgreSQL: {DATABASE_URL[:30]}...")
 else:
-    # Local SQLite
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, 'data')
     os.makedirs(DATA_DIR, exist_ok=True)
-    db_path = os.path.join(DATA_DIR, 'shows.db').replace('\\', '/')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-    print(f"Using SQLite: {db_path}")
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(DATA_DIR, "shows.db").replace(chr(92), "/")}'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vfx-tracker-secret-key-2026')
@@ -109,6 +103,7 @@ class Shot(db.Model):
     bid_days = db.Column(db.Integer, default=0)
     used_days = db.Column(db.Integer, default=0)
     deadline = db.Column(db.String(50))
+    __table_args__ = (UniqueConstraint('show_id', 'name', name='uq_shot_show_name'),)
 
 class Task(db.Model):
     __tablename__ = 'tasks'
@@ -447,7 +442,7 @@ def create_artist(show_id):
     log_action(show_id, f"Artist '{artist.name}' added")
     return jsonify({"success": True, "id": artist.id})
 
-@app.route('/api/artists/<int:artist_id>', methods=['PUT'])
+@app.route('/api/artists/<int:artist_id>', methods(['PUT'])
 def update_artist(artist_id):
     artist = Artist.query.get_or_404(artist_id)
     data = request.json
@@ -498,6 +493,11 @@ def get_shots(show_id):
 @app.route('/api/shows/<int:show_id>/shots', methods=['POST'])
 def create_shot(show_id):
     data = request.json
+    # Check for duplicate name
+    existing = Shot.query.filter_by(show_id=show_id, name=data.get('name', '')).first()
+    if existing:
+        return jsonify({"success": False, "error": "A shot with this name already exists in the show"}), 400
+
     shot = Shot(
         show_id=show_id, sequence_id=data.get('sequence_id'),
         name=data.get('name', ''), description=data.get('description', ''),
@@ -536,6 +536,10 @@ def create_shots_bulk(show_id):
     names = parse_shot_pattern(pattern, count)
     created = []
     for name in names:
+        # Check duplicate per shot
+        existing = Shot.query.filter_by(show_id=show_id, name=name).first()
+        if existing:
+            continue  # skip duplicates
         shot = Shot(
             show_id=show_id, sequence_id=sequence_id, name=name,
             shot_type=shot_type, status=status, priority=priority,
@@ -547,12 +551,20 @@ def create_shots_bulk(show_id):
         created.append(name)
     db.session.commit()
     log_action(show_id, f"Bulk created {len(created)} shots from pattern '{pattern}'")
-    return jsonify({"success": True, "created": len(created), "names": names})
+    return jsonify({"success": True, "created": len(created), "names": created})
 
 @app.route('/api/shots/<int:shot_id>', methods=['PUT'])
 def update_shot(shot_id):
     shot = Shot.query.get_or_404(shot_id)
     data = request.json
+
+    # Check duplicate name if name is being changed
+    new_name = data.get('name', shot.name)
+    if new_name != shot.name:
+        existing = Shot.query.filter_by(show_id=shot.show_id, name=new_name).first()
+        if existing:
+            return jsonify({"success": False, "error": "A shot with this name already exists in the show"}), 400
+
     shot.sequence_id = data.get('sequence_id', shot.sequence_id)
     shot.name = data.get('name', shot.name)
     shot.description = data.get('description', shot.description)
@@ -595,6 +607,27 @@ def delete_shot(shot_id):
     db.session.commit()
     log_action(show_id, f"Shot '{name}' deleted")
     return jsonify({"success": True})
+
+@app.route('/api/shots/bulk_delete', methods=['POST'])
+def bulk_delete_shots():
+    data = request.json
+    shot_ids = data.get('shot_ids', [])
+    password = data.get('password', '')
+    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+        return jsonify({"success": False, "error": "Incorrect password"}), 403
+    if not shot_ids:
+        return jsonify({"success": False, "error": "No shots selected"}), 400
+    deleted = 0
+    for sid in shot_ids:
+        shot = Shot.query.get(sid)
+        if shot:
+            Task.query.filter_by(shot_id=sid).delete()
+            db.session.delete(shot)
+            deleted += 1
+    db.session.commit()
+    if deleted > 0:
+        log_action(shot.show_id if shot else None, f"Bulk deleted {deleted} shots")
+    return jsonify({"success": True, "deleted": deleted})
 
 @app.route('/api/shots/<int:shot_id>/status', methods=['PATCH'])
 def update_shot_status(shot_id):

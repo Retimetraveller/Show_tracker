@@ -35,6 +35,7 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            flex-wrap: wrap;
         }
         .filter-actions button {
             background: var(--elevated);
@@ -65,6 +66,10 @@
             cursor: pointer;
             color: var(--text);
             min-width: 100px;
+        }
+        .client-status-select option {
+            background: #12182a !important;
+            color: #e8edf5 !important;
         }
         .playlist-grid {
             display: grid;
@@ -351,23 +356,49 @@
         .btn-danger:hover {
             background: #ef4444;
         }
-        .client-status-select {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 4px 10px;
-            font-weight: 600;
-            font-size: 11px;
-            cursor: pointer;
+
+        /* ===== BULK DELETE ===== */
+        .bulk-delete-bar {
+            display: none;
+            background: var(--elevated);
+            border: 1px solid var(--danger);
+            border-radius: var(--radius-sm);
+            padding: 10px 16px;
+            margin: 8px 0 16px 0;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .bulk-delete-bar.visible {
+            display: flex;
+        }
+        .bulk-delete-bar .count {
+            color: var(--text2);
+            font-size: 13px;
+        }
+        .bulk-delete-bar .count strong {
             color: var(--text);
-            min-width: 100px;
         }
-        .client-status-select option {
-            background: #12182a !important;
-            color: #e8edf5 !important;
+        .bulk-delete-bar .btn-danger {
+            padding: 6px 16px;
+            font-size: 12px;
         }
-        .client-status-select option:hover {
-            background: #1a2038 !important;
+        .shot-checkbox {
+            accent-color: var(--accent);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .select-all-checkbox {
+            accent-color: var(--accent);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .data-table th:first-child,
+        .data-table td:first-child {
+            text-align: center;
+            width: 40px;
         }
     </style>
 </head>
@@ -502,6 +533,14 @@
                             <button class="btn btn-secondary" onclick="openAddShotModal()">+ Add Single</button>
                         </div>
                     </div>
+
+                    <!-- Bulk Delete Bar -->
+                    <div class="bulk-delete-bar" id="bulkDeleteBar">
+                        <span class="count"><strong id="selectedCount">0</strong> shots selected</span>
+                        <button class="btn btn-danger" onclick="confirmBulkDelete()">🗑 Delete Selected</button>
+                        <button class="btn btn-secondary" onclick="clearAllSelections()" style="padding:4px 12px;font-size:12px;">Clear</button>
+                    </div>
+
                     <!-- Sequence Filter -->
                     <div class="filters-bar" style="flex-wrap:wrap;gap:8px;align-items:center;">
                         <span style="font-size:13px;color:var(--text2);">Filter by Sequence:</span>
@@ -509,7 +548,7 @@
                         <div class="filter-actions">
                             <button onclick="selectAllSequences()">Select All</button>
                             <button onclick="deselectAllSequences()">Deselect All</button>
-                            <button onclick="clearAllFilters()" style="background:var(--danger);color:#fff;border-color:var(--danger);">Clear All Filters</button>
+                            <button onclick="clearAllFilters()" style="background:var(--danger);color:#fff;border-color:var(--danger);">Clear Filters</button>
                         </div>
                     </div>
                     <!-- Filters -->
@@ -1191,8 +1230,11 @@
     let selectedSequences = new Set();
     let playlists = [];
     let currentPlaylistId = null;
+    let playlistAllShots = [];
     let sortColumn = 'name';
     let sortDirection = 'asc';
+    let selectedShotIds = new Set();
+    let lastSelectedIndex = -1;
 
     const STATUS_COLORS = {
         "Not Started": "#6b7280",
@@ -1279,6 +1321,10 @@
         populateSequenceDropdowns();
         if (currentTab === 'kanban') loadKanban();
         if (currentTab === 'playlists') loadPlaylists();
+        // Clear selections when show changes
+        selectedShotIds = new Set();
+        lastSelectedIndex = -1;
+        updateBulkDeleteBar();
     }
 
     function populateSequenceDropdowns() {
@@ -1483,6 +1529,7 @@
         renderSequenceFilter();
         renderShotsBySequence();
     }
+
     function clearAllFilters() {
         selectAllSequences();
         document.getElementById('shotSearch').value = '';
@@ -1493,8 +1540,111 @@
         renderShotsBySequence();
     }
 
+    // ==================== SORTING ====================
+    function sortShots(column) {
+        if (sortColumn === column) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortColumn = column;
+            sortDirection = 'asc';
+        }
+        renderShotsBySequence();
+    }
+
+    // ==================== BULK DELETE ====================
+    function toggleShotSelection(shotId, event, index) {
+        if (event.shiftKey && lastSelectedIndex >= 0) {
+            // Shift+Click: select range
+            const start = Math.min(lastSelectedIndex, index);
+            const end = Math.max(lastSelectedIndex, index);
+            const allCheckboxes = document.querySelectorAll('.shot-checkbox');
+            for (let i = start; i <= end; i++) {
+                if (allCheckboxes[i]) {
+                    const cb = allCheckboxes[i];
+                    cb.checked = true;
+                    selectedShotIds.add(parseInt(cb.dataset.id));
+                }
+            }
+        } else {
+            // Normal click: toggle individual
+            if (selectedShotIds.has(shotId)) {
+                selectedShotIds.delete(shotId);
+                const cb = document.querySelector(`.shot-checkbox[data-id="${shotId}"]`);
+                if (cb) cb.checked = false;
+            } else {
+                selectedShotIds.add(shotId);
+                const cb = document.querySelector(`.shot-checkbox[data-id="${shotId}"]`);
+                if (cb) cb.checked = true;
+            }
+            lastSelectedIndex = index;
+        }
+        updateBulkDeleteBar();
+    }
+
+    function toggleSelectAll() {
+        const selectAll = document.querySelector('.select-all-checkbox');
+        const allCheckboxes = document.querySelectorAll('.shot-checkbox');
+        if (selectAll.checked) {
+            allCheckboxes.forEach(cb => {
+                cb.checked = true;
+                selectedShotIds.add(parseInt(cb.dataset.id));
+            });
+        } else {
+            allCheckboxes.forEach(cb => {
+                cb.checked = false;
+                selectedShotIds.delete(parseInt(cb.dataset.id));
+            });
+        }
+        updateBulkDeleteBar();
+    }
+
+    function clearAllSelections() {
+        document.querySelectorAll('.shot-checkbox').forEach(cb => {
+            cb.checked = false;
+            selectedShotIds.delete(parseInt(cb.dataset.id));
+        });
+        const selectAll = document.querySelector('.select-all-checkbox');
+        if (selectAll) selectAll.checked = false;
+        updateBulkDeleteBar();
+    }
+
+    function updateBulkDeleteBar() {
+        const bar = document.getElementById('bulkDeleteBar');
+        const count = selectedShotIds.size;
+        document.getElementById('selectedCount').textContent = count;
+        if (count > 0) {
+            bar.classList.add('visible');
+        } else {
+            bar.classList.remove('visible');
+        }
+    }
+
+    async function confirmBulkDelete() {
+        if (selectedShotIds.size === 0) return;
+        const password = prompt('Enter deletion password to confirm:');
+        if (!password) return;
+        if (!confirm(`Delete ${selectedShotIds.size} selected shots?`)) return;
+
+        const ids = Array.from(selectedShotIds);
+        const res = await fetch('/api/shots/bulk_delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({shot_ids: ids, password: password})
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        alert(`Deleted ${data.deleted} shots successfully!`);
+        selectedShotIds = new Set();
+        clearAllSelections();
+        await loadShowData();
+        renderShotsBySequence();
+        updateBulkDeleteBar();
+    }
+
     // ==================== RENDER SHOTS BY SEQUENCE ====================
-    // FIX: Client status does NOT filter shots – all shots appear regardless of client_status
     function renderShotsBySequence() {
         const container = document.getElementById('shotsContainer');
         const search = document.getElementById('shotSearch').value.toLowerCase();
@@ -1510,10 +1660,10 @@
 
         let filteredShots = shots.filter(s => {
             return (!search || s.name.toLowerCase().includes(search)) &&
-                (!status || s.status === status) &&
-                (!priority || s.priority === priority) &&
-                (!artist || s.assigned_to === artist) &&
-                (!department || (s.department || '').split(',').includes(department));
+                   (!status || s.status === status) &&
+                   (!priority || s.priority === priority) &&
+                   (!artist || s.assigned_to === artist) &&
+                   (!department || (s.department || '').split(',').includes(department));
         });
 
         // SORTING
@@ -1593,6 +1743,7 @@
             html += `<div class="table-container" style="border-radius:0;">`;
             html += `<table class="data-table">`;
             html += `<thead><tr>
+                <th><input type="checkbox" class="select-all-checkbox" onchange="toggleSelectAll()" ${selectedShotIds.size === filteredShots.length && filteredShots.length > 0 ? 'checked' : ''}></th>
                 <th style="cursor:pointer;user-select:none;" onclick="sortShots('name')">Shot Name ${sortColumn === 'name' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
                 <th>Type</th>
                 <th>Frames</th>
@@ -1607,10 +1758,11 @@
                 <th>Actions</th>
             </tr></thead><tbody>`;
 
-            group.shots.forEach(shot => {
+            group.shots.forEach((shot, index) => {
                 const statusColor = STATUS_BG_COLORS[shot.status] || STATUS_BG_COLORS['Not Started'];
                 const statusTextColor = STATUS_COLORS[shot.status] || STATUS_COLORS['Not Started'];
                 const clientColor = CLIENT_STATUS_COLORS[shot.client_status] || '#6b7280';
+                const isSelected = selectedShotIds.has(shot.id);
                 let deadlineHtml = '-';
                 if (shot.deadline) {
                     const now = new Date();
@@ -1634,6 +1786,8 @@
                 }
 
                 html += `<tr>
+                    <td><input type="checkbox" class="shot-checkbox" data-id="${shot.id}" ${isSelected ? 'checked' : ''}
+                               onchange="toggleShotSelection(${shot.id}, event, ${index})"></td>
                     <td><strong>${shot.name}</strong></td>
                     <td>${shot.shot_type || '-'}</td>
                     <td>${shot.frames || '-'}</td>
@@ -1678,7 +1832,9 @@
             html = `<div style="text-align:center;padding:40px;color:var(--text2);">No shots found matching your filters.</div>`;
         }
         container.innerHTML = html;
+        updateBulkDeleteBar();
     }
+
     async function updateShotStatus(shotId, status) {
         await fetch(`/api/shots/${shotId}/status`, {
             method: 'PATCH',
@@ -1689,15 +1845,7 @@
         if (shot) shot.status = status;
         renderShotsBySequence();
     }
-    function sortShots(column) {
-        if (sortColumn === column) {
-            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            sortColumn = column;
-            sortDirection = 'asc';
-        }
-        renderShotsBySequence();
-    }
+
     async function updateClientStatus(shotId, clientStatus) {
         await fetch(`/api/shots/${shotId}/client_status`, {
             method: 'PATCH',
@@ -1790,13 +1938,10 @@
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({client_status: status})
         });
-        // Refresh both views
         loadClientShots();
-        // Also refresh shots list if shots tab is active
-        if (currentTab === 'shots') renderShotsBySequence();
-        // Update local shots array
         const shot = shots.find(s => s.id === shotId);
         if (shot) shot.client_status = status;
+        if (currentTab === 'shots') renderShotsBySequence();
     }
 
     async function updateClientNote(shotId, note) {
@@ -2431,7 +2576,12 @@
         if (!data.name) { alert('Shot name is required'); return; }
         const url = editingId ? `/api/shots/${editingId}` : `/api/shows/${currentShowId}/shots`;
         const method = editingId ? 'PUT' : 'POST';
-        await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+        const res = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+        const result = await res.json();
+        if (!result.success) {
+            alert(result.error || 'Failed to save shot');
+            return;
+        }
         closeModal('shotModal');
         await loadShowData();
         loadShots();
@@ -2511,6 +2661,10 @@
             method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
         });
         const result = await res.json();
+        if (!result.success) {
+            alert(result.error || 'Failed to create shots');
+            return;
+        }
         alert(`Created ${result.created} shots successfully!`);
         closeModal('bulkShotModal');
         await loadShowData();
