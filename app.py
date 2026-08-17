@@ -442,7 +442,7 @@ def create_artist(show_id):
     log_action(show_id, f"Artist '{artist.name}' added")
     return jsonify({"success": True, "id": artist.id})
 
-@app.route('/api/artists/<int:artist_id>', methods(['PUT'])
+@app.route('/api/artists/<int:artist_id>', methods=['PUT'])
 def update_artist(artist_id):
     artist = Artist.query.get_or_404(artist_id)
     data = request.json
