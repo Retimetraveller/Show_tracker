@@ -9,18 +9,20 @@ DATABASE_URL = input("Enter your Neon PostgreSQL DATABASE_URL: ")
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
-# Connect to local SQLite
-sqlite_path = os.path.join(os.path.dirname(__file__), 'data', 'shows.db')
+# Build correct path: project_root/data/shows.db
+# __file__ is inside migrate/, so go up one level to project root
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sqlite_path = os.path.join(project_root, 'data', 'shows.db')
+
 if not os.path.exists(sqlite_path):
-    print(f"Error: SQLite file not found at {sqlite_path}")
-    sys.exit(1)
+    print(f"Creating new database at {sqlite_path}")
+    os.makedirs(os.path.dirname(sqlite_path), exist_ok=True)
+    import sqlite3
+    conn = sqlite3.connect(sqlite_path)
+    conn.close()
 
 sqlite_conn = sqlite3.connect(sqlite_path)
 sqlite_cursor = sqlite_conn.cursor()
-
-# Connect to Neon
-pg_conn = psycopg2.connect(DATABASE_URL)
-pg_cursor = pg_conn.cursor()
 
 # Clear local tables in correct order (child first)
 tables = ['history', 'shots', 'sequences', 'artists', 'shows']
@@ -28,7 +30,10 @@ for table in tables:
     sqlite_cursor.execute(f"DELETE FROM {table}")
     print(f"Cleared local {table}")
 
-# Copy each table from Neon to SQLite
+# Connect to Neon
+pg_conn = psycopg2.connect(DATABASE_URL)
+pg_cursor = pg_conn.cursor()
+
 def copy_table(table, columns):
     pg_cursor.execute(f"SELECT {','.join(columns)} FROM {table}")
     rows = pg_cursor.fetchall()
@@ -52,7 +57,8 @@ copy_table('artists', ['id', 'show_id', 'name', 'department', 'email', 'phone', 
 copy_table('shots', ['id', 'show_id', 'sequence_id', 'name', 'description', 'shot_type',
                      'frames', 'duration', 'status', 'priority', 'assigned_to', 'notes',
                      'created_at', 'updated_at', 'client_status', 'client_notes',
-                     'client_sent_date', 'client_approved_date', 'department', 'thumbnail', 'tasks'])
+                     'client_sent_date', 'client_approved_date', 'department', 'thumbnail', 'version',
+                     'bid_days', 'used_days', 'deadline'])
 
 copy_table('history', ['id', 'show_id', 'action', 'timestamp'])
 

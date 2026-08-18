@@ -238,7 +238,7 @@
         .kanban-card:hover {
             transform: translateY(-3px);
             border-color: var(--accent);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
         }
         .kanban-card:active {
             cursor: grabbing;
@@ -336,14 +336,14 @@
             border: 2px dashed var(--border);
             border-radius: var(--radius-sm);
         }
-        .deadline-critical { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: #ef4444; }
-        .deadline-warning { background: rgba(251, 146, 60, 0.15); color: #fb923c; border-color: #fb923c; }
-        .deadline-attention { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border-color: #fbbf24; }
-        .deadline-good { background: rgba(74, 222, 128, 0.15); color: #4ade80; border-color: #4ade80; }
-        .deadline-overdue { background: rgba(239, 68, 68, 0.25); color: #ef4444; border-color: #ef4444; font-weight: bold; }
-        .bid-over { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
-        .bid-ok { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
-        .bid-warning { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+        .deadline-critical { background: rgba(239,68,68,0.15); color: #ef4444; border-color: #ef4444; }
+        .deadline-warning { background: rgba(251,146,60,0.15); color: #fb923c; border-color: #fb923c; }
+        .deadline-attention { background: rgba(251,191,36,0.15); color: #fbbf24; border-color: #fbbf24; }
+        .deadline-good { background: rgba(74,222,128,0.15); color: #4ade80; border-color: #4ade80; }
+        .deadline-overdue { background: rgba(239,68,68,0.25); color: #ef4444; border-color: #ef4444; font-weight: bold; }
+        .bid-over { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .bid-ok { background: rgba(74,222,128,0.15); color: #4ade80; }
+        .bid-warning { background: rgba(251,191,36,0.15); color: #fbbf24; }
         .playlist-detail-actions {
             display: flex;
             gap: 8px;
@@ -356,8 +356,6 @@
         .btn-danger:hover {
             background: #ef4444;
         }
-
-        /* ===== BULK DELETE ===== */
         .bulk-delete-bar {
             display: none;
             background: var(--elevated);
@@ -404,7 +402,6 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Header -->
         <header class="app-header">
             <div class="logo">
                 <span class="logo-icon">&#127909;</span>
@@ -416,12 +413,10 @@
             </div>
         </header>
 
-        <!-- Show Tabs -->
         <div class="show-tabs-container" id="showTabs">
             <div class="show-tabs" id="showTabsList"></div>
         </div>
 
-        <!-- Main Content -->
         <div class="main-content" id="mainContent">
             <div class="no-show-selected" id="noShowSelected">
                 <div class="empty-state">
@@ -432,7 +427,6 @@
             </div>
 
             <div class="show-content" id="showContent" style="display:none;">
-                <!-- Inner Navigation -->
                 <nav class="inner-nav">
                     <button class="nav-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">
                         <span class="nav-icon">&#128202;</span> Dashboard
@@ -466,62 +460,23 @@
                 <!-- Dashboard Tab -->
                 <div class="tab-panel active" id="panel-dashboard">
                     <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-value" id="statShots">0</div>
-                            <div class="stat-label">Total Shots</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="statSeqs">0</div>
-                            <div class="stat-label">Sequences</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="statArtists">0</div>
-                            <div class="stat-label">Artists</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="statCompletion">0%</div>
-                            <div class="stat-label">Completion</div>
-                        </div>
+                        <div class="stat-card"><div class="stat-value" id="statShots">0</div><div class="stat-label">Total Shots</div></div>
+                        <div class="stat-card"><div class="stat-value" id="statSeqs">0</div><div class="stat-label">Sequences</div></div>
+                        <div class="stat-card"><div class="stat-value" id="statArtists">0</div><div class="stat-label">Artists</div></div>
+                        <div class="stat-card"><div class="stat-value" id="statCompletion">0%</div><div class="stat-label">Completion</div></div>
                     </div>
                     <div class="dashboard-charts">
-                        <div class="chart-card">
-                            <h3>Status Distribution</h3>
-                            <canvas id="statusChart"></canvas>
-                        </div>
-                        <div class="chart-card">
-                            <h3>Client Status</h3>
-                            <canvas id="clientChart"></canvas>
-                        </div>
-                        <div class="chart-card">
-                            <h3>Recent Activity</h3>
-                            <div class="activity-list" id="activityList"></div>
-                        </div>
+                        <div class="chart-card"><h3>Status Distribution</h3><canvas id="statusChart"></canvas></div>
+                        <div class="chart-card"><h3>Client Status</h3><canvas id="clientChart"></canvas></div>
+                        <div class="chart-card"><h3>Recent Activity</h3><div class="activity-list" id="activityList"></div></div>
                     </div>
-                    <div class="show-info-card">
-                        <h3>Show Info</h3>
-                        <div class="info-grid" id="showInfoGrid"></div>
-                    </div>
+                    <div class="show-info-card"><h3>Show Info</h3><div class="info-grid" id="showInfoGrid"></div></div>
                 </div>
 
                 <!-- Sequences Tab -->
                 <div class="tab-panel" id="panel-sequences">
-                    <div class="section-header">
-                        <h2>Sequences</h2>
-                        <button class="btn btn-primary" onclick="openAddSequenceModal()">+ Add Sequence</button>
-                    </div>
-                    <div class="table-container">
-                        <table class="data-table" id="sequencesTable">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Description</th>
-                                    <th>Shots</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
+                    <div class="section-header"><h2>Sequences</h2><button class="btn btn-primary" onclick="openAddSequenceModal()">+ Add Sequence</button></div>
+                    <div class="table-container"><table class="data-table" id="sequencesTable"><thead><tr><th>Name</th><th>Description</th><th>Shots</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                 </div>
 
                 <!-- Shots Tab -->
@@ -534,14 +489,12 @@
                         </div>
                     </div>
 
-                    <!-- Bulk Delete Bar -->
                     <div class="bulk-delete-bar" id="bulkDeleteBar">
                         <span class="count"><strong id="selectedCount">0</strong> shots selected</span>
                         <button class="btn btn-danger" onclick="confirmBulkDelete()">🗑 Delete Selected</button>
                         <button class="btn btn-secondary" onclick="clearAllSelections()" style="padding:4px 12px;font-size:12px;">Clear</button>
                     </div>
 
-                    <!-- Sequence Filter -->
                     <div class="filters-bar" style="flex-wrap:wrap;gap:8px;align-items:center;">
                         <span style="font-size:13px;color:var(--text2);">Filter by Sequence:</span>
                         <div id="sequenceFilterContainer" class="seq-filter-container"></div>
@@ -549,81 +502,31 @@
                             <button onclick="selectAllSequences()">Select All</button>
                             <button onclick="deselectAllSequences()">Deselect All</button>
                             <button onclick="clearAllFilters()" style="background:var(--danger);color:#fff;border-color:var(--danger);">Clear Filters</button>
+                            <button onclick="refreshShots()" style="background:var(--accent);color:#fff;border-color:var(--accent);">⟳ Refresh</button>
                         </div>
                     </div>
-                    <!-- Filters -->
                     <div class="filters-bar">
                         <input type="text" class="filter-input" id="shotSearch" placeholder="Search shots..." oninput="filterShots()">
-                        <select class="filter-select" id="filterStatus" onchange="filterShots()">
-                            <option value="">All Statuses</option>
-                            <option>Not Started</option>
-                            <option>WIP</option>
-                            <option>Review</option>
-                            <option>Approved</option>
-                            <option>On Hold</option>
-                            <option>Omit</option>
-                        </select>
-                        <select class="filter-select" id="filterPriority" onchange="filterShots()">
-                            <option value="">All Priorities</option>
-                            <option>Low</option>
-                            <option>Normal</option>
-                            <option>High</option>
-                            <option>Critical</option>
-                        </select>
-                        <select class="filter-select" id="filterArtist" onchange="filterShots()">
-                            <option value="">All Artists</option>
-                        </select>
-                        <select class="filter-select" id="filterDepartment" onchange="filterShots()">
-                            <option value="">All Departments</option>
-                            <option>Animation</option>
-                            <option>Modeling</option>
-                            <option>Layout</option>
-                            <option>Matchmove</option>
-                            <option>Roto</option>
-                            <option>Paint</option>
-                            <option>CFX</option>
-                            <option>Groom</option>
-                            <option>RotoAnim</option>
-                            <option>Lighting</option>
-                            <option>Compositing</option>
-                            <option>FX</option>
-                        </select>
+                        <select class="filter-select" id="filterStatus" onchange="filterShots()"><option value="">All Statuses</option><option>Not Started</option><option>WIP</option><option>Review</option><option>Approved</option><option>On Hold</option><option>Omit</option></select>
+                        <select class="filter-select" id="filterPriority" onchange="filterShots()"><option value="">All Priorities</option><option>Low</option><option>Normal</option><option>High</option><option>Critical</option></select>
+                        <select class="filter-select" id="filterArtist" onchange="filterShots()"><option value="">All Artists</option></select>
+                        <select class="filter-select" id="filterDepartment" onchange="filterShots()"><option value="">All Departments</option><option>Animation</option><option>Modeling</option><option>Layout</option><option>Matchmove</option><option>Roto</option><option>Paint</option><option>CFX</option><option>Groom</option><option>RotoAnim</option><option>Lighting</option><option>Compositing</option><option>FX</option></select>
                     </div>
                     <div id="shotsContainer">
-                        <!-- Sequences and their shots will be rendered here -->
+                        <!-- Shots will be rendered here -->
                     </div>
                 </div>
 
                 <!-- Artists Tab -->
                 <div class="tab-panel" id="panel-artists">
-                    <div class="section-header">
-                        <h2>Artists</h2>
-                        <button class="btn btn-primary" onclick="openAddArtistModal()">+ Add Artist</button>
-                    </div>
-                    <div class="table-container">
-                        <table class="data-table" id="artistsTable">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Department</th>
-                                    <th>Role</th>
-                                    <th>Email</th>
-                                    <th>Phone</th>
-                                    <th>Rate</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
+                    <div class="section-header"><h2>Artists</h2><button class="btn btn-primary" onclick="openAddArtistModal()">+ Add Artist</button></div>
+                    <div class="table-container"><table class="data-table" id="artistsTable"><thead><tr><th>Name</th><th>Department</th><th>Role</th><th>Email</th><th>Phone</th><th>Rate</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                 </div>
 
                 <!-- Client Updates Tab -->
                 <div class="tab-panel" id="panel-client_updates">
-                    <div class="section-header">
-                        <h2>Client Updates</h2>
-                    </div>
-                    <div class="stats-grid" id="clientStats" style="grid-template-columns: repeat(4, 1fr);">
+                    <div class="section-header"><h2>Client Updates</h2></div>
+                    <div class="stats-grid" id="clientStats" style="grid-template-columns:repeat(4,1fr);">
                         <div class="stat-card"><div class="stat-value" id="clientTotal">0</div><div class="stat-label">Total Client Shots</div></div>
                         <div class="stat-card"><div class="stat-value" id="clientApproved" style="color:#4ade80;">0</div><div class="stat-label">Approved</div></div>
                         <div class="stat-card"><div class="stat-value" id="clientChanges" style="color:#f87171;">0</div><div class="stat-label">Changes Requested</div></div>
@@ -631,108 +534,35 @@
                     </div>
                     <div class="filters-bar">
                         <input type="text" class="filter-input" id="clientSearch" placeholder="Search shots..." oninput="loadClientShots()">
-                        <select class="filter-select" id="clientFilterStatus" onchange="loadClientShots()">
-                            <option value="">All Client Status</option>
-                            <option>Approved</option>
-                            <option>Changes Requested</option>
-                            <option>Pending</option>
-                            <option>Not Sent</option>
-                            <option>Retake</option>
-                        </select>
-                        <select class="filter-select" id="clientFilterSequence" onchange="loadClientShots()">
-                            <option value="">All Sequences</option>
-                        </select>
+                        <select class="filter-select" id="clientFilterStatus" onchange="loadClientShots()"><option value="">All Client Status</option><option>Approved</option><option>Changes Requested</option><option>Pending</option><option>Not Sent</option><option>Retake</option></select>
+                        <select class="filter-select" id="clientFilterSequence" onchange="loadClientShots()"><option value="">All Sequences</option></select>
                     </div>
-                    <div class="table-container">
-                        <table class="data-table" id="clientTable">
-                            <thead>
-                                <tr>
-                                    <th>Shot Name</th>
-                                    <th>Sequence</th>
-                                    <th>Internal Status</th>
-                                    <th>Client Status</th>
-                                    <th>Client Notes</th>
-                                    <th>Sent Date</th>
-                                </tr>
-                            </thead>
-                            <tbody id="clientTableBody">
-                                <tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px;">Loading shots...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <div class="table-container"><table class="data-table" id="clientTable"><thead><tr><th>Shot Name</th><th>Sequence</th><th>Internal Status</th><th>Client Status</th><th>Client Notes</th><th>Sent Date</th></tr></thead><tbody id="clientTableBody"></tbody></table></div>
                 </div>
 
                 <!-- Department View Tab -->
                 <div class="tab-panel" id="panel-department">
-                    <div class="section-header">
-                        <h2 id="deptTitle">Department View</h2>
-                    </div>
+                    <div class="section-header"><h2 id="deptTitle">Department View</h2></div>
                     <div class="filters-bar">
-                        <select class="filter-select" id="deptSelect" onchange="loadDepartmentShots()">
-                            <option value="Animation">Animation</option>
-                            <option value="Modeling">Modeling</option>
-                            <option value="Layout">Layout</option>
-                            <option value="Matchmove">Matchmove</option>
-                            <option value="Roto">Roto</option>
-                            <option value="Paint">Paint</option>
-                            <option value="CFX">CFX</option>
-                            <option value="Groom">Groom</option>
-                            <option value="RotoAnim">RotoAnim</option>
-                            <option value="Lighting">Lighting</option>
-                            <option value="Compositing">Compositing</option>
-                            <option value="FX">FX</option>
-                        </select>
-                        <select class="filter-select" id="deptSeqFilter" onchange="loadDepartmentShots()">
-                            <option value="">All Sequences</option>
-                        </select>
-                        <select class="filter-select" id="deptStatusFilter" onchange="loadDepartmentShots()">
-                            <option value="">All Statuses</option>
-                            <option>Not Started</option>
-                            <option>WIP</option>
-                            <option>Review</option>
-                            <option>Approved</option>
-                            <option>On Hold</option>
-                            <option>Omit</option>
-                        </select>
+                        <select class="filter-select" id="deptSelect" onchange="loadDepartmentShots()"><option value="Animation">Animation</option><option value="Modeling">Modeling</option><option value="Layout">Layout</option><option value="Matchmove">Matchmove</option><option value="Roto">Roto</option><option value="Paint">Paint</option><option value="CFX">CFX</option><option value="Groom">Groom</option><option value="RotoAnim">RotoAnim</option><option value="Lighting">Lighting</option><option value="Compositing">Compositing</option><option value="FX">FX</option></select>
+                        <select class="filter-select" id="deptSeqFilter" onchange="loadDepartmentShots()"><option value="">All Sequences</option></select>
+                        <select class="filter-select" id="deptStatusFilter" onchange="loadDepartmentShots()"><option value="">All Statuses</option><option>Not Started</option><option>WIP</option><option>Review</option><option>Approved</option><option>On Hold</option><option>Omit</option></select>
                         <input type="text" class="filter-input" id="deptSearch" placeholder="Search..." oninput="loadDepartmentShots()">
                     </div>
-                    <div class="table-container">
-                        <table class="data-table" id="deptTable">
-                            <thead>
-                                <tr>
-                                    <th>Shot Name</th>
-                                    <th>Sequence</th>
-                                    <th>Status</th>
-                                    <th>Priority</th>
-                                    <th>Assigned To</th>
-                                    <th>Client Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="deptTableBody">
-                                <tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px;">Loading shots...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <div class="table-container"><table class="data-table" id="deptTable"><thead><tr><th>Shot Name</th><th>Sequence</th><th>Status</th><th>Priority</th><th>Assigned To</th><th>Client Status</th></tr></thead><tbody id="deptTableBody"></tbody></table></div>
                 </div>
 
                 <!-- Playlists Tab -->
                 <div class="tab-panel" id="panel-playlists">
-                    <div class="section-header">
-                        <h2>Playlists</h2>
-                        <button class="btn btn-primary" onclick="openCreatePlaylistModal()">+ Create Playlist</button>
-                    </div>
-                    <div id="playlistContent">
-                        <div style="text-align:center;padding:40px;color:var(--text2);">Loading playlists...</div>
-                    </div>
+                    <div class="section-header"><h2>Playlists</h2><button class="btn btn-primary" onclick="openCreatePlaylistModal()">+ Create Playlist</button></div>
+                    <div id="playlistContent"><div style="text-align:center;padding:40px;color:var(--text2);">Loading playlists...</div></div>
                 </div>
 
                 <!-- Kanban Tab -->
                 <div class="tab-panel" id="panel-kanban">
                     <div class="kanban-board-container">
                         <div class="kanban-filters">
-                            <select id="kanbanSeqFilter" onchange="loadKanban()">
-                                <option value="">All Sequences</option>
-                            </select>
+                            <select id="kanbanSeqFilter" onchange="loadKanban()"><option value="">All Sequences</option></select>
                             <button class="btn btn-secondary" onclick="loadKanban()">&#8635; Refresh</button>
                         </div>
                         <div id="kanbanBoard" class="kanban-board">
@@ -746,475 +576,41 @@
 
                 <!-- Reports Tab -->
                 <div class="tab-panel" id="panel-reports">
-                    <div class="section-header">
-                        <h2>Reports & Export</h2>
-                    </div>
+                    <div class="section-header"><h2>Reports & Export</h2></div>
                     <div class="reports-grid">
-                        <div class="report-card">
-                            <h3>Export Shots</h3>
-                            <p>Download all shots for this show as CSV.</p>
-                            <button class="btn btn-primary" onclick="exportShots()">Download CSV</button>
-                        </div>
-                        <div class="report-card">
-                            <h3>Export Artists</h3>
-                            <p>Download all artists for this show as CSV.</p>
-                            <button class="btn btn-primary" onclick="exportArtists()">Download CSV</button>
-                        </div>
-                        <div class="report-card">
-                            <h3>Show Info</h3>
-                            <p>View and edit show details.</p>
-                            <button class="btn btn-secondary" onclick="openEditShowModal()">Edit Show</button>
-                        </div>
+                        <div class="report-card"><h3>Export Shots</h3><p>Download all shots for this show as CSV.</p><button class="btn btn-primary" onclick="exportShots()">Download CSV</button></div>
+                        <div class="report-card"><h3>Export Artists</h3><p>Download all artists for this show as CSV.</p><button class="btn btn-primary" onclick="exportArtists()">Download CSV</button></div>
+                        <div class="report-card"><h3>Show Info</h3><p>View and edit show details.</p><button class="btn btn-secondary" onclick="openEditShowModal()">Edit Show</button></div>
                     </div>
-                    <div class="history-section">
-                        <h3>Activity History</h3>
-                        <div class="activity-list-full" id="historyList"></div>
-                    </div>
+                    <div class="history-section"><h3>Activity History</h3><div class="activity-list-full" id="historyList"></div></div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- ==================== MODALS ==================== -->
-    <!-- Add/Edit Show Modal -->
-    <div class="modal-overlay" id="showModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 id="showModalTitle">Add Show</h2>
-                <button class="modal-close" onclick="closeModal('showModal')">&times;</button>
-            </div>
-            <div class="modal-body modal-scrollable">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Show Name *</label>
-                        <input type="text" id="showName" placeholder="Enter show name">
-                    </div>
-                    <div class="form-group">
-                        <label>Client</label>
-                        <input type="text" id="showClient" placeholder="Client name">
-                    </div>
-                    <div class="form-group">
-                        <label>Producer</label>
-                        <input type="text" id="showProducer" placeholder="Producer name">
-                    </div>
-                    <div class="form-group">
-                        <label>VFX Supervisor</label>
-                        <input type="text" id="showVfxSup" placeholder="VFX Supervisor">
-                    </div>
-                    <div class="form-group">
-                        <label>Comp Supervisor</label>
-                        <input type="text" id="showCompSup" placeholder="Comp Supervisor">
-                    </div>
-                    <div class="form-group">
-                        <label>Status</label>
-                        <select id="showStatus">
-                            <option value="Active">Active</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Complete">Complete</option>
-                            <option value="On Hold">On Hold</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Start Date</label>
-                        <input type="date" id="showStartDate">
-                    </div>
-                    <div class="form-group">
-                        <label>Delivery Date</label>
-                        <input type="date" id="showDeliveryDate">
-                    </div>
-                    <div class="form-group">
-                        <label>Budget</label>
-                        <input type="text" id="showBudget" placeholder="Budget">
-                    </div>
-                    <div class="form-group">
-                        <label>FPS</label>
-                        <input type="text" id="showFps" value="24">
-                    </div>
-                    <div class="form-group">
-                        <label>Resolution</label>
-                        <input type="text" id="showResolution" value="1920x1080">
-                    </div>
-                    <div class="form-group">
-                        <label>Colorspace</label>
-                        <input type="text" id="showColorspace" value="ACES">
-                    </div>
-                </div>
-                <div class="form-group full-width">
-                    <label>Notes</label>
-                    <textarea id="showNotes" rows="3" placeholder="Notes..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('showModal')">Cancel</button>
-                <button class="btn btn-primary" id="showSaveBtn" onclick="saveShow()">Save Show</button>
-            </div>
-        </div>
-    </div>
+    <!-- Show Modal -->
+    <div class="modal-overlay" id="showModal"><div class="modal"><div class="modal-header"><h2 id="showModalTitle">Add Show</h2><button class="modal-close" onclick="closeModal('showModal')">&times;</button></div><div class="modal-body modal-scrollable"><div class="form-grid"><div class="form-group"><label>Show Name *</label><input type="text" id="showName" placeholder="Enter show name"></div><div class="form-group"><label>Client</label><input type="text" id="showClient" placeholder="Client name"></div><div class="form-group"><label>Producer</label><input type="text" id="showProducer" placeholder="Producer name"></div><div class="form-group"><label>VFX Supervisor</label><input type="text" id="showVfxSup" placeholder="VFX Supervisor"></div><div class="form-group"><label>Comp Supervisor</label><input type="text" id="showCompSup" placeholder="Comp Supervisor"></div><div class="form-group"><label>Status</label><select id="showStatus"><option value="Active">Active</option><option value="Pending">Pending</option><option value="Complete">Complete</option><option value="On Hold">On Hold</option></select></div><div class="form-group"><label>Start Date</label><input type="date" id="showStartDate"></div><div class="form-group"><label>Delivery Date</label><input type="date" id="showDeliveryDate"></div><div class="form-group"><label>Budget</label><input type="text" id="showBudget" placeholder="Budget"></div><div class="form-group"><label>FPS</label><input type="text" id="showFps" value="24"></div><div class="form-group"><label>Resolution</label><input type="text" id="showResolution" value="1920x1080"></div><div class="form-group"><label>Colorspace</label><input type="text" id="showColorspace" value="ACES"></div></div><div class="form-group full-width"><label>Notes</label><textarea id="showNotes" rows="3" placeholder="Notes..."></textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('showModal')">Cancel</button><button class="btn btn-primary" id="showSaveBtn" onclick="saveShow()">Save Show</button></div></div></div>
 
-    <!-- Add/Edit Sequence Modal -->
-    <div class="modal-overlay" id="sequenceModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 id="seqModalTitle">Add Sequence</h2>
-                <button class="modal-close" onclick="closeModal('sequenceModal')">&times;</button>
-            </div>
-            <div class="modal-body modal-scrollable">
-                <div class="form-group">
-                    <label>Sequence Name *</label>
-                    <input type="text" id="seqName" placeholder="e.g., seq_01">
-                </div>
-                <div class="form-group">
-                    <label>Description</label>
-                    <textarea id="seqDescription" rows="3" placeholder="Description..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('sequenceModal')">Cancel</button>
-                <button class="btn btn-primary" id="seqSaveBtn" onclick="saveSequence()">Save</button>
-            </div>
-        </div>
-    </div>
+    <!-- Sequence Modal -->
+    <div class="modal-overlay" id="sequenceModal"><div class="modal"><div class="modal-header"><h2 id="seqModalTitle">Add Sequence</h2><button class="modal-close" onclick="closeModal('sequenceModal')">&times;</button></div><div class="modal-body modal-scrollable"><div class="form-group"><label>Sequence Name *</label><input type="text" id="seqName" placeholder="e.g., seq_01"></div><div class="form-group"><label>Description</label><textarea id="seqDescription" rows="3" placeholder="Description..."></textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('sequenceModal')">Cancel</button><button class="btn btn-primary" id="seqSaveBtn" onclick="saveSequence()">Save</button></div></div></div>
 
-    <!-- Add/Edit Shot Modal -->
-    <div class="modal-overlay" id="shotModal">
-        <div class="modal modal-wide">
-            <div class="modal-header">
-                <h2 id="shotModalTitle">Add Shot</h2>
-                <button class="modal-close" onclick="closeModal('shotModal')">&times;</button>
-            </div>
-            <div class="modal-body modal-scrollable">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Shot Name *</label>
-                        <input type="text" id="shotName" placeholder="e.g., Show_seq_01_sh_001">
-                    </div>
-                    <div class="form-group">
-                        <label>Sequence</label>
-                        <select id="shotSequence"></select>
-                    </div>
-                    <div class="form-group">
-                        <label>Shot Type</label>
-                        <select id="shotType">
-                            <option value="">Select Type</option>
-                            <option>VFX</option>
-                            <option>CG</option>
-                            <option>Cleanup</option>
-                            <option>Roto</option>
-                            <option>Matchmove</option>
-                            <option>Paint</option>
-                            <option>Compositing</option>
-                            <option>Full CG</option>
-                            <option>Element</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Frames</label>
-                        <input type="text" id="shotFrames" placeholder="e.g., 1001-1100">
-                    </div>
-                    <div class="form-group">
-                        <label>Duration</label>
-                        <input type="text" id="shotDuration" placeholder="e.g., 4s">
-                    </div>
-                    <div class="form-group">
-                        <label>Status</label>
-                        <select id="shotStatus">
-                            <option>Not Started</option>
-                            <option>WIP</option>
-                            <option>Review</option>
-                            <option>Approved</option>
-                            <option>On Hold</option>
-                            <option>Omit</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Priority</label>
-                        <select id="shotPriority">
-                            <option>Low</option>
-                            <option selected>Normal</option>
-                            <option>High</option>
-                            <option>Critical</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Assigned To</label>
-                        <select id="shotAssigned"></select>
-                    </div>
-                    <div class="form-group">
-                        <label>Department</label>
-                        <select id="shotDepartment">
-                            <option value="">Select Department</option>
-                            <option>Animation</option>
-                            <option>Modeling</option>
-                            <option>Layout</option>
-                            <option>Matchmove</option>
-                            <option>Roto</option>
-                            <option>Paint</option>
-                            <option>CFX</option>
-                            <option>Groom</option>
-                            <option>RotoAnim</option>
-                            <option>Lighting</option>
-                            <option>Compositing</option>
-                            <option>FX</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Client Status</label>
-                        <select id="shotClientStatus">
-                            <option value="Not Sent">Not Sent</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Approved">Approved</option>
-                            <option value="Changes Requested">Changes Requested</option>
-                            <option value="Retake">Retake</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Bid Days</label>
-                        <input type="number" id="shotBidDays" value="0" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Used Days</label>
-                        <input type="number" id="shotUsedDays" value="0" min="0">
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Deadline</label>
-                        <input type="date" id="shotDeadline">
-                    </div>
-                </div>
-                <div class="form-group full-width">
-                    <label>Client Notes</label>
-                    <textarea id="shotClientNotes" rows="2" placeholder="Notes for client..."></textarea>
-                </div>
-                <div class="form-group full-width">
-                    <label>Description</label>
-                    <textarea id="shotDescription" rows="2" placeholder="Description..."></textarea>
-                </div>
-                <div class="form-group full-width">
-                    <label>Notes</label>
-                    <textarea id="shotNotes" rows="2" placeholder="Notes..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('shotModal')">Cancel</button>
-                <button class="btn btn-primary" id="shotSaveBtn" onclick="saveShot()">Save Shot</button>
-            </div>
-        </div>
-    </div>
+    <!-- Shot Modal -->
+    <div class="modal-overlay" id="shotModal"><div class="modal modal-wide"><div class="modal-header"><h2 id="shotModalTitle">Add Shot</h2><button class="modal-close" onclick="closeModal('shotModal')">&times;</button></div><div class="modal-body modal-scrollable"><div class="form-grid"><div class="form-group"><label>Shot Name *</label><input type="text" id="shotName" placeholder="e.g., Show_seq_01_sh_001"></div><div class="form-group"><label>Sequence</label><select id="shotSequence"></select></div><div class="form-group"><label>Shot Type</label><select id="shotType"><option value="">Select Type</option><option>VFX</option><option>CG</option><option>Cleanup</option><option>Roto</option><option>Matchmove</option><option>Paint</option><option>Compositing</option><option>Full CG</option><option>Element</option></select></div><div class="form-group"><label>Frames</label><input type="text" id="shotFrames" placeholder="e.g., 1001-1100"></div><div class="form-group"><label>Duration</label><input type="text" id="shotDuration" placeholder="e.g., 4s"></div><div class="form-group"><label>Status</label><select id="shotStatus"><option>Not Started</option><option>WIP</option><option>Review</option><option>Approved</option><option>On Hold</option><option>Omit</option></select></div><div class="form-group"><label>Priority</label><select id="shotPriority"><option>Low</option><option selected>Normal</option><option>High</option><option>Critical</option></select></div><div class="form-group"><label>Assigned To</label><select id="shotAssigned"></select></div><div class="form-group"><label>Department</label><select id="shotDepartment"><option value="">Select Department</option><option>Animation</option><option>Modeling</option><option>Layout</option><option>Matchmove</option><option>Roto</option><option>Paint</option><option>CFX</option><option>Groom</option><option>RotoAnim</option><option>Lighting</option><option>Compositing</option><option>FX</option></select></div><div class="form-group"><label>Client Status</label><select id="shotClientStatus"><option value="Not Sent">Not Sent</option><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Changes Requested">Changes Requested</option><option value="Retake">Retake</option></select></div><div class="form-group"><label>Bid Days</label><input type="number" id="shotBidDays" value="0" min="0"></div><div class="form-group"><label>Used Days</label><input type="number" id="shotUsedDays" value="0" min="0"></div><div class="form-group full-width"><label>Deadline</label><input type="date" id="shotDeadline"></div></div><div class="form-group full-width"><label>Client Notes</label><textarea id="shotClientNotes" rows="2" placeholder="Notes for client..."></textarea></div><div class="form-group full-width"><label>Description</label><textarea id="shotDescription" rows="2" placeholder="Description..."></textarea></div><div class="form-group full-width"><label>Notes</label><textarea id="shotNotes" rows="2" placeholder="Notes..."></textarea></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('shotModal')">Cancel</button><button class="btn btn-primary" id="shotSaveBtn" onclick="saveShot()">Save Shot</button></div></div></div>
 
     <!-- Bulk Add Shots Modal -->
-    <div class="modal-overlay" id="bulkShotModal">
-        <div class="modal modal-wide">
-            <div class="modal-header">
-                <h2>Bulk Add Shots</h2>
-                <button class="modal-close" onclick="closeModal('bulkShotModal')">&times;</button>
-            </div>
-            <div class="modal-body modal-scrollable">
-                <div class="info-box">
-                    <strong>How it works:</strong> Enter a shot name pattern like <code>Show_seq_01_sh_001</code> and specify how many shots to create. The last number will auto-increment.
-                </div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Shot Pattern *</label>
-                        <input type="text" id="bulkPattern" placeholder="e.g., Show_seq_01_sh_001" value="Show_seq_01_sh_001">
-                    </div>
-                    <div class="form-group">
-                        <label>Number of Shots *</label>
-                        <input type="number" id="bulkCount" placeholder="e.g., 100" min="1" max="9999" value="10">
-                    </div>
-                    <div class="form-group">
-                        <label>Sequence</label>
-                        <select id="bulkSequence"></select>
-                    </div>
-                    <div class="form-group">
-                        <label>Shot Type</label>
-                        <select id="bulkType">
-                            <option value="">Select Type</option>
-                            <option>VFX</option>
-                            <option>CG</option>
-                            <option>Cleanup</option>
-                            <option>Roto</option>
-                            <option>Matchmove</option>
-                            <option>Paint</option>
-                            <option>Compositing</option>
-                            <option>Full CG</option>
-                            <option>Element</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Status</label>
-                        <select id="bulkStatus">
-                            <option>Not Started</option>
-                            <option>WIP</option>
-                            <option>Review</option>
-                            <option>Approved</option>
-                            <option>On Hold</option>
-                            <option>Omit</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Priority</label>
-                        <select id="bulkPriority">
-                            <option>Low</option>
-                            <option selected>Normal</option>
-                            <option>High</option>
-                            <option>Critical</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Assigned To</label>
-                        <select id="bulkAssigned"></select>
-                    </div>
-                    <div class="form-group">
-                        <label>Department</label>
-                        <select id="bulkDepartment">
-                            <option value="">Select Department</option>
-                            <option>Animation</option>
-                            <option>Modeling</option>
-                            <option>Layout</option>
-                            <option>Matchmove</option>
-                            <option>Roto</option>
-                            <option>Paint</option>
-                            <option>CFX</option>
-                            <option>Groom</option>
-                            <option>RotoAnim</option>
-                            <option>Lighting</option>
-                            <option>Compositing</option>
-                            <option>FX</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Frames</label>
-                        <input type="text" id="bulkFrames" placeholder="e.g., 1001-1100">
-                    </div>
-                    <div class="form-group">
-                        <label>Duration</label>
-                        <input type="text" id="bulkDuration" placeholder="e.g., 4s">
-                    </div>
-                    <div class="form-group">
-                        <label>Bid Days</label>
-                        <input type="number" id="bulkBidDays" value="0" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Deadline</label>
-                        <input type="date" id="bulkDeadline">
-                    </div>
-                </div>
-                <div class="form-group full-width">
-                    <label>Notes</label>
-                    <textarea id="bulkNotes" rows="2" placeholder="Notes..."></textarea>
-                </div>
-                <div class="preview-section">
-                    <h4>Preview</h4>
-                    <div class="preview-list" id="bulkPreview"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('bulkShotModal')">Cancel</button>
-                <button class="btn btn-primary" onclick="saveBulkShots()">Create Shots</button>
-            </div>
-        </div>
-    </div>
+    <div class="modal-overlay" id="bulkShotModal"><div class="modal modal-wide"><div class="modal-header"><h2>Bulk Add Shots</h2><button class="modal-close" onclick="closeModal('bulkShotModal')">&times;</button></div><div class="modal-body modal-scrollable"><div class="info-box"><strong>How it works:</strong> Enter a shot name pattern like <code>Show_seq_01_sh_001</code> and specify how many shots to create. The last number will auto-increment.</div><div class="form-grid"><div class="form-group"><label>Shot Pattern *</label><input type="text" id="bulkPattern" placeholder="e.g., Show_seq_01_sh_001" value="Show_seq_01_sh_001"></div><div class="form-group"><label>Number of Shots *</label><input type="number" id="bulkCount" placeholder="e.g., 100" min="1" max="9999" value="10"></div><div class="form-group"><label>Sequence</label><select id="bulkSequence"></select></div><div class="form-group"><label>Shot Type</label><select id="bulkType"><option value="">Select Type</option><option>VFX</option><option>CG</option><option>Cleanup</option><option>Roto</option><option>Matchmove</option><option>Paint</option><option>Compositing</option><option>Full CG</option><option>Element</option></select></div><div class="form-group"><label>Status</label><select id="bulkStatus"><option>Not Started</option><option>WIP</option><option>Review</option><option>Approved</option><option>On Hold</option><option>Omit</option></select></div><div class="form-group"><label>Priority</label><select id="bulkPriority"><option>Low</option><option selected>Normal</option><option>High</option><option>Critical</option></select></div><div class="form-group"><label>Assigned To</label><select id="bulkAssigned"></select></div><div class="form-group"><label>Department</label><select id="bulkDepartment"><option value="">Select Department</option><option>Animation</option><option>Modeling</option><option>Layout</option><option>Matchmove</option><option>Roto</option><option>Paint</option><option>CFX</option><option>Groom</option><option>RotoAnim</option><option>Lighting</option><option>Compositing</option><option>FX</option></select></div><div class="form-group"><label>Frames</label><input type="text" id="bulkFrames" placeholder="e.g., 1001-1100"></div><div class="form-group"><label>Duration</label><input type="text" id="bulkDuration" placeholder="e.g., 4s"></div><div class="form-group"><label>Bid Days</label><input type="number" id="bulkBidDays" value="0" min="0"></div><div class="form-group"><label>Deadline</label><input type="date" id="bulkDeadline"></div></div><div class="form-group full-width"><label>Notes</label><textarea id="bulkNotes" rows="2" placeholder="Notes..."></textarea></div><div class="preview-section"><h4>Preview</h4><div class="preview-list" id="bulkPreview"></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('bulkShotModal')">Cancel</button><button class="btn btn-primary" onclick="saveBulkShots()">Create Shots</button></div></div></div>
 
-    <!-- Add/Edit Artist Modal -->
-    <div class="modal-overlay" id="artistModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 id="artistModalTitle">Add Artist</h2>
-                <button class="modal-close" onclick="closeModal('artistModal')">&times;</button>
-            </div>
-            <div class="modal-body modal-scrollable">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Artist Name *</label>
-                        <input type="text" id="artistName" placeholder="Full name">
-                    </div>
-                    <div class="form-group">
-                        <label>Department</label>
-                        <select id="artistDepartment">
-                            <option value="">Select Department</option>
-                            <option>Compositing</option>
-                            <option>Lighting</option>
-                            <option>FX</option>
-                            <option>Animation</option>
-                            <option>Roto</option>
-                            <option>Prep</option>
-                            <option>Matchmove</option>
-                            <option>Concept</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Role</label>
-                        <input type="text" id="artistRole" placeholder="e.g., Lead Compositor">
-                    </div>
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="artistEmail" placeholder="email@studio.com">
-                    </div>
-                    <div class="form-group">
-                        <label>Phone</label>
-                        <input type="text" id="artistPhone" placeholder="Phone number">
-                    </div>
-                    <div class="form-group">
-                        <label>Rate</label>
-                        <input type="text" id="artistRate" placeholder="e.g., $500/day">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('artistModal')">Cancel</button>
-                <button class="btn btn-primary" id="artistSaveBtn" onclick="saveArtist()">Save Artist</button>
-            </div>
-        </div>
-    </div>
+    <!-- Artist Modal -->
+    <div class="modal-overlay" id="artistModal"><div class="modal"><div class="modal-header"><h2 id="artistModalTitle">Add Artist</h2><button class="modal-close" onclick="closeModal('artistModal')">&times;</button></div><div class="modal-body modal-scrollable"><div class="form-grid"><div class="form-group"><label>Artist Name *</label><input type="text" id="artistName" placeholder="Full name"></div><div class="form-group"><label>Department</label><select id="artistDepartment"><option value="">Select Department</option><option>Compositing</option><option>Lighting</option><option>FX</option><option>Animation</option><option>Roto</option><option>Prep</option><option>Matchmove</option><option>Concept</option></select></div><div class="form-group"><label>Role</label><input type="text" id="artistRole" placeholder="e.g., Lead Compositor"></div><div class="form-group"><label>Email</label><input type="email" id="artistEmail" placeholder="email@studio.com"></div><div class="form-group"><label>Phone</label><input type="text" id="artistPhone" placeholder="Phone number"></div><div class="form-group"><label>Rate</label><input type="text" id="artistRate" placeholder="e.g., $500/day"></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('artistModal')">Cancel</button><button class="btn btn-primary" id="artistSaveBtn" onclick="saveArtist()">Save Artist</button></div></div></div>
 
     <!-- Playlist Create Modal -->
-    <div class="modal-overlay" id="createPlaylistModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Create Playlist</h2>
-                <button class="modal-close" onclick="closeModal('createPlaylistModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Playlist Name *</label>
-                    <input type="text" id="playlistName" placeholder="e.g., Dailies - June 15" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);">
-                </div>
-                <div class="form-group">
-                    <label>Description</label>
-                    <textarea id="playlistDesc" rows="2" placeholder="What's this playlist for?" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Add Shots (optional)</label>
-                    <div id="playlistShotSelector" style="max-height:200px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;">
-                        <span style="color:var(--text3);font-size:13px;">Loading shots...</span>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('createPlaylistModal')">Cancel</button>
-                <button class="btn btn-primary" onclick="savePlaylist()">Create</button>
-            </div>
-        </div>
-    </div>
+    <div class="modal-overlay" id="createPlaylistModal"><div class="modal"><div class="modal-header"><h2>Create Playlist</h2><button class="modal-close" onclick="closeModal('createPlaylistModal')">&times;</button></div><div class="modal-body"><div class="form-group"><label>Playlist Name *</label><input type="text" id="playlistName" placeholder="e.g., Dailies - June 15" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);"></div><div class="form-group"><label>Description</label><textarea id="playlistDesc" rows="2" placeholder="What's this playlist for?" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);"></textarea></div><div class="form-group"><label>Add Shots (optional)</label><div id="playlistShotSelector" style="max-height:200px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;"><span style="color:var(--text3);font-size:13px;">Loading shots...</span></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('createPlaylistModal')">Cancel</button><button class="btn btn-primary" onclick="savePlaylist()">Create</button></div></div></div>
 
     <!-- Add Shots to Playlist Modal -->
-    <div class="modal-overlay" id="addShotsModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Add Shots to Playlist</h2>
-                <button class="modal-close" onclick="closeModal('addShotsModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="addShotsList" style="max-height:300px;overflow-y:auto;">
-                    <span style="color:var(--text3);">Loading shots...</span>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('addShotsModal')">Cancel</button>
-                <button class="btn btn-primary" onclick="saveAddShots()">Add Selected</button>
-            </div>
-        </div>
-    </div>
+    <div class="modal-overlay" id="addShotsModal"><div class="modal"><div class="modal-header"><h2>Add Shots to Playlist</h2><button class="modal-close" onclick="closeModal('addShotsModal')">&times;</button></div><div class="modal-body"><div id="addShotsList" style="max-height:300px;overflow-y:auto;"><span style="color:var(--text3);">Loading shots...</span></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('addShotsModal')">Cancel</button><button class="btn btn-primary" onclick="saveAddShots()">Add Selected</button></div></div></div>
 
+    <!-- ==================== JAVASCRIPT ==================== -->
     <script>
     // ==================== STATE ====================
     let shows = [];
@@ -1236,29 +632,9 @@
     let selectedShotIds = new Set();
     let lastSelectedIndex = -1;
 
-    const STATUS_COLORS = {
-        "Not Started": "#6b7280",
-        "WIP": "#fbbf24",
-        "Review": "#60a5fa",
-        "Approved": "#4ade80",
-        "On Hold": "#f87171",
-        "Omit": "#888888"
-    };
-    const STATUS_BG_COLORS = {
-        "Not Started": "rgba(107, 114, 128, 0.15)",
-        "WIP": "rgba(251, 191, 36, 0.15)",
-        "Review": "rgba(96, 165, 250, 0.15)",
-        "Approved": "rgba(74, 222, 128, 0.15)",
-        "On Hold": "rgba(248, 113, 113, 0.15)",
-        "Omit": "rgba(136, 136, 136, 0.15)"
-    };
-    const CLIENT_STATUS_COLORS = {
-        "Not Sent": "#6b7280",
-        "Pending": "#fbbf24",
-        "Approved": "#4ade80",
-        "Changes Requested": "#f87171",
-        "Retake": "#fb923c"
-    };
+    const STATUS_COLORS = { "Not Started": "#6b7280", "WIP": "#fbbf24", "Review": "#60a5fa", "Approved": "#4ade80", "On Hold": "#f87171", "Omit": "#888888" };
+    const STATUS_BG_COLORS = { "Not Started": "rgba(107,114,128,0.15)", "WIP": "rgba(251,191,36,0.15)", "Review": "rgba(96,165,250,0.15)", "Approved": "rgba(74,222,128,0.15)", "On Hold": "rgba(248,113,113,0.15)", "Omit": "rgba(136,136,136,0.15)" };
+    const CLIENT_STATUS_COLORS = { "Not Sent": "#6b7280", "Pending": "#fbbf24", "Approved": "#4ade80", "Changes Requested": "#f87171", "Retake": "#fb923c" };
 
     // ==================== INIT ====================
     document.addEventListener('DOMContentLoaded', () => {
@@ -1321,7 +697,6 @@
         populateSequenceDropdowns();
         if (currentTab === 'kanban') loadKanban();
         if (currentTab === 'playlists') loadPlaylists();
-        // Clear selections when show changes
         selectedShotIds = new Set();
         lastSelectedIndex = -1;
         updateBulkDeleteBar();
@@ -1353,7 +728,6 @@
         else if (currentTab === 'reports') loadReports();
     }
 
-    // ==================== TABS ====================
     function switchTab(tab) {
         currentTab = tab;
         document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -1453,15 +827,7 @@
         const tbody = document.querySelector('#sequencesTable tbody');
         tbody.innerHTML = sequences.map(seq => {
             const shotCount = shots.filter(s => s.sequence_id === seq.id).length;
-            return `<tr>
-                <td>${seq.name}</td>
-                <td>${seq.description || ''}</td>
-                <td>${shotCount}</td>
-                <td>
-                    <button class="btn-icon" onclick="openEditSequenceModal(${seq.id})">&#9998;</button>
-                    <button class="btn-icon btn-danger" onclick="deleteSequence(${seq.id})">&#128465;</button>
-                </td>
-            </tr>`;
+            return `<tr><td>${seq.name}</td><td>${seq.description || ''}</td><td>${shotCount}</td><td><button class="btn-icon" onclick="openEditSequenceModal(${seq.id})">&#9998;</button><button class="btn-icon btn-danger" onclick="deleteSequence(${seq.id})">&#128465;</button></td></tr>`;
         }).join('');
     }
 
@@ -1540,6 +906,19 @@
         renderShotsBySequence();
     }
 
+    // ==================== REFRESH ====================
+    function refreshShots() {
+        document.getElementById('shotsContainer').innerHTML = `
+            <div style="text-align:center;padding:60px 20px;color:var(--text2);">
+                <div style="font-size:32px;margin-bottom:12px;">⏳</div>
+                <p>Loading shots...</p>
+            </div>
+        `;
+        loadShowData().then(() => {
+            renderShotsBySequence();
+        });
+    }
+
     // ==================== SORTING ====================
     function sortShots(column) {
         if (sortColumn === column) {
@@ -1554,7 +933,6 @@
     // ==================== BULK DELETE ====================
     function toggleShotSelection(shotId, event, index) {
         if (event.shiftKey && lastSelectedIndex >= 0) {
-            // Shift+Click: select range
             const start = Math.min(lastSelectedIndex, index);
             const end = Math.max(lastSelectedIndex, index);
             const allCheckboxes = document.querySelectorAll('.shot-checkbox');
@@ -1566,7 +944,6 @@
                 }
             }
         } else {
-            // Normal click: toggle individual
             if (selectedShotIds.has(shotId)) {
                 selectedShotIds.delete(shotId);
                 const cb = document.querySelector(`.shot-checkbox[data-id="${shotId}"]`);
@@ -1647,6 +1024,18 @@
     // ==================== RENDER SHOTS BY SEQUENCE ====================
     function renderShotsBySequence() {
         const container = document.getElementById('shotsContainer');
+
+        // Show loading if no data yet
+        if (!shots || shots.length === 0) {
+            container.innerHTML = `
+                <div style="text-align:center;padding:60px 20px;color:var(--text2);">
+                    <div style="font-size:32px;margin-bottom:12px;">⏳</div>
+                    <p>Loading shots...</p>
+                </div>
+            `;
+            return;
+        }
+
         const search = document.getElementById('shotSearch').value.toLowerCase();
         const status = document.getElementById('filterStatus').value;
         const priority = document.getElementById('filterPriority').value;
@@ -1666,47 +1055,24 @@
                    (!department || (s.department || '').split(',').includes(department));
         });
 
-        // SORTING
         filteredShots.sort((a, b) => {
             let valA, valB;
             switch(sortColumn) {
-                case 'name':
-                    valA = a.name.toLowerCase();
-                    valB = b.name.toLowerCase();
-                    break;
-                case 'status':
-                    valA = a.status;
-                    valB = b.status;
-                    break;
-                case 'priority':
-                    const priorityOrder = { 'Low': 0, 'Normal': 1, 'High': 2, 'Critical': 3 };
-                    valA = priorityOrder[a.priority] || 0;
-                    valB = priorityOrder[b.priority] || 0;
-                    break;
-                case 'artist':
-                    valA = (a.assigned_to || '').toLowerCase();
-                    valB = (b.assigned_to || '').toLowerCase();
-                    break;
-                case 'department':
-                    valA = (a.department || '').toLowerCase();
-                    valB = (b.department || '').toLowerCase();
-                    break;
-                case 'client_status':
-                    const clientOrder = { 'Not Sent': 0, 'Pending': 1, 'Approved': 2, 'Changes Requested': 3, 'Retake': 4 };
-                    valA = clientOrder[a.client_status] || 0;
-                    valB = clientOrder[b.client_status] || 0;
-                    break;
-                case 'deadline':
-                    valA = a.deadline ? new Date(a.deadline).getTime() : 0;
-                    valB = b.deadline ? new Date(b.deadline).getTime() : 0;
-                    break;
-                case 'bid_used':
-                    valA = a.used_days || 0;
-                    valB = b.used_days || 0;
-                    break;
-                default:
-                    valA = a.name.toLowerCase();
-                    valB = b.name.toLowerCase();
+                case 'name': valA = a.name.toLowerCase(); valB = b.name.toLowerCase(); break;
+                case 'status': valA = a.status; valB = b.status; break;
+                case 'priority': {
+                    const order = { 'Low': 0, 'Normal': 1, 'High': 2, 'Critical': 3 };
+                    valA = order[a.priority] || 0; valB = order[b.priority] || 0; break;
+                }
+                case 'artist': valA = (a.assigned_to || '').toLowerCase(); valB = (b.assigned_to || '').toLowerCase(); break;
+                case 'department': valA = (a.department || '').toLowerCase(); valB = (b.department || '').toLowerCase(); break;
+                case 'client_status': {
+                    const order = { 'Not Sent': 0, 'Pending': 1, 'Approved': 2, 'Changes Requested': 3, 'Retake': 4 };
+                    valA = order[a.client_status] || 0; valB = order[b.client_status] || 0; break;
+                }
+                case 'deadline': valA = a.deadline ? new Date(a.deadline).getTime() : 0; valB = b.deadline ? new Date(b.deadline).getTime() : 0; break;
+                case 'bid_used': valA = a.used_days || 0; valB = b.used_days || 0; break;
+                default: valA = a.name.toLowerCase(); valB = b.name.toLowerCase();
             }
             if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
             if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
@@ -1723,10 +1089,7 @@
         });
         const orphanedShots = filteredShots.filter(s => !s.sequence_id || !existingSeqIds.has(s.sequence_id));
         if (orphanedShots.length > 0) {
-            seqGroups['unassigned'] = {
-                name: 'Unassigned / Orphaned',
-                shots: orphanedShots
-            };
+            seqGroups['unassigned'] = { name: 'Unassigned / Orphaned', shots: orphanedShots };
         }
 
         let html = '';
@@ -1768,11 +1131,11 @@
                     const now = new Date();
                     const deadlineDate = new Date(shot.deadline);
                     const diff = Math.ceil((deadlineDate - now) / (1000*60*60*24));
-                    if (diff < 0) { deadlineHtml = `<span class="deadline-overdue">${Math.abs(diff)}d overdue</span>`; }
-                    else if (diff < 7) { deadlineHtml = `<span class="deadline-critical">${diff}d</span>`; }
-                    else if (diff < 14) { deadlineHtml = `<span class="deadline-warning">${diff}d</span>`; }
-                    else if (diff < 30) { deadlineHtml = `<span class="deadline-attention">${diff}d</span>`; }
-                    else { deadlineHtml = `<span class="deadline-good">${diff}d</span>`; }
+                    if (diff < 0) deadlineHtml = `<span class="deadline-overdue">${Math.abs(diff)}d overdue</span>`;
+                    else if (diff < 7) deadlineHtml = `<span class="deadline-critical">${diff}d</span>`;
+                    else if (diff < 14) deadlineHtml = `<span class="deadline-warning">${diff}d</span>`;
+                    else if (diff < 30) deadlineHtml = `<span class="deadline-attention">${diff}d</span>`;
+                    else deadlineHtml = `<span class="deadline-good">${diff}d</span>`;
                 }
                 let bidUsedHtml = '-';
                 if (shot.bid_days !== undefined && shot.used_days !== undefined) {
@@ -1835,6 +1198,7 @@
         updateBulkDeleteBar();
     }
 
+    // ==================== API CALLS ====================
     async function updateShotStatus(shotId, status) {
         await fetch(`/api/shots/${shotId}/status`, {
             method: 'PATCH',
@@ -2006,7 +1370,6 @@
     function renderPlaylists() {
         const container = document.getElementById('playlistContent');
         if (!container) return;
-
         if (playlists.length === 0) {
             container.innerHTML = `
                 <div style="text-align:center;padding:60px 20px;color:var(--text2);">
@@ -2018,7 +1381,6 @@
             `;
             return;
         }
-
         let html = `<div class="playlist-grid">`;
         playlists.forEach(p => {
             const shotCount = p.shot_ids ? p.shot_ids.length : 0;
@@ -2038,10 +1400,8 @@
         currentPlaylistId = id;
         const playlist = playlists.find(p => p.id === id);
         if (!playlist) return;
-
         const shotIds = playlist.shot_ids || [];
         const playlistShots = shots.filter(s => shotIds.includes(s.id));
-
         const container = document.getElementById('playlistContent');
         container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
@@ -2086,12 +1446,10 @@
         const name = document.getElementById('playlistName').value.trim();
         const description = document.getElementById('playlistDesc').value.trim();
         if (!name) { alert('Playlist name is required'); return; }
-
         const selected = [];
         document.querySelectorAll('.playlist-shot-checkbox:checked').forEach(cb => {
             selected.push(parseInt(cb.value));
         });
-
         const res = await fetch(`/api/shows/${currentShowId}/playlists`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -2108,7 +1466,6 @@
         if (!currentPlaylistId) return;
         const playlist = playlists.find(p => p.id === currentPlaylistId);
         const existingIds = playlist?.shot_ids || [];
-
         const container = document.getElementById('addShotsList');
         if (container) {
             container.innerHTML = shots.map(s => `
@@ -2125,10 +1482,8 @@
         document.querySelectorAll('.add-shot-checkbox:checked').forEach(cb => {
             selected.push(parseInt(cb.value));
         });
-
         const playlist = playlists.find(p => p.id === currentPlaylistId);
         if (!playlist) return;
-
         await fetch(`/api/playlists/${currentPlaylistId}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
@@ -2148,7 +1503,6 @@
         const password = prompt("Enter deletion password:");
         if (!password) return;
         if (!confirm('Delete this playlist?')) return;
-
         const res = await fetch(`/api/playlists/${currentPlaylistId}`, {
             method: 'DELETE',
             headers: {'Content-Type': 'application/json'},
@@ -2163,20 +1517,15 @@
     // ==================== KANBAN ====================
     async function loadKanban() {
         if (!currentShowId) return;
-        
         const seqFilter = document.getElementById('kanbanSeqFilter').value;
         let url = `/api/kanban/${currentShowId}`;
-        if (seqFilter) {
-            url += `?sequence=${seqFilter}`;
-        }
+        if (seqFilter) url += `?sequence=${seqFilter}`;
 
         try {
             const res = await fetch(url);
             const columns = await res.json();
-
             const board = document.getElementById('kanbanBoard');
             board.innerHTML = '';
-
             const columnOrder = ['Not Started', 'WIP', 'Review', 'Approved', 'On Hold', 'Omit'];
 
             columnOrder.forEach(status => {
@@ -2247,12 +1596,10 @@
                         }).join('')}
                     </div>
                 `;
-
                 board.appendChild(col);
             });
 
             attachKanbanDragEvents();
-
         } catch (err) {
             console.error('Kanban load error:', err);
             document.getElementById('kanbanBoard').innerHTML = `
@@ -2269,7 +1616,6 @@
             card.addEventListener('dragstart', handleDragStart);
             card.addEventListener('dragend', handleDragEnd);
         });
-
         document.querySelectorAll('.kanban-column-body').forEach(col => {
             col.addEventListener('dragover', handleDragOver);
             col.addEventListener('dragenter', handleDragEnter);
@@ -2288,45 +1634,35 @@
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', this.dataset.id);
     }
-
     function handleDragEnd(e) {
         this.classList.remove('dragging');
         document.querySelectorAll('.kanban-column-body').forEach(c => c.classList.remove('drag-over'));
     }
-
     function handleDragOver(e) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
     }
-
     function handleDragEnter(e) {
         e.preventDefault();
         this.classList.add('drag-over');
     }
-
     function handleDragLeave(e) {
         this.classList.remove('drag-over');
     }
-
     async function handleDrop(e) {
         e.preventDefault();
         this.classList.remove('drag-over');
-
         const shotId = parseInt(e.dataTransfer.getData('text/plain'));
         const newStatus = this.dataset.status;
-
         if (!shotId || !newStatus) return;
 
         const card = document.querySelector(`.kanban-card[data-id="${shotId}"]`);
         if (card) {
             card.remove();
             const newCol = this;
-            if (newCol.querySelector('.empty-column')) {
-                newCol.querySelector('.empty-column').remove();
-            }
+            if (newCol.querySelector('.empty-column')) newCol.querySelector('.empty-column').remove();
             newCol.appendChild(card);
             card.dataset.status = newStatus;
-
             const countSpan = this.closest('.kanban-column').querySelector('.count');
             if (countSpan) {
                 const current = parseInt(countSpan.textContent) || 0;
@@ -2335,9 +1671,7 @@
             const oldCol = card.closest('.kanban-column');
             if (oldCol && oldCol !== this.closest('.kanban-column')) {
                 const oldCount = oldCol.querySelector('.count');
-                if (oldCount) {
-                    oldCount.textContent = parseInt(oldCount.textContent) - 1;
-                }
+                if (oldCount) oldCount.textContent = parseInt(oldCount.textContent) - 1;
             }
         }
 
@@ -2356,7 +1690,6 @@
             console.error('Error:', err);
             loadKanban();
         }
-
         if (navigator.vibrate) navigator.vibrate(50);
     }
 
