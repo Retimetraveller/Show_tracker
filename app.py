@@ -10,6 +10,10 @@ from sqlalchemy import UniqueConstraint
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 
+# ==================== CREATE FLASK APP ====================
+app = Flask(__name__)
+
+# ==================== DISABLE CACHING ====================
 @app.after_request
 def add_header(response):
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
@@ -397,7 +401,7 @@ def create_sequence(show_id):
     log_action(show_id, f"Sequence '{seq.name}' added")
     return jsonify({"success": True, "id": seq.id})
 
-@app.route('/api/sequences/<int:seq_id>', methods=['PUT'])
+@app.route('/api/sequences/<int:seq_id>', methods(['PUT'])
 def update_sequence(seq_id):
     seq = Sequence.query.get_or_404(seq_id)
     data = request.json
@@ -631,7 +635,9 @@ def bulk_delete_shots():
             deleted += 1
     db.session.commit()
     if deleted > 0:
-        log_action(shot.show_id if shot else None, f"Bulk deleted {deleted} shots")
+        first_shot = Shot.query.get(shot_ids[0]) if shot_ids else None
+        if first_shot:
+            log_action(first_shot.show_id, f"Bulk deleted {deleted} shots")
     return jsonify({"success": True, "deleted": deleted})
 
 @app.route('/api/shots/<int:shot_id>/status', methods=['PATCH'])
