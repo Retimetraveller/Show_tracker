@@ -10,7 +10,12 @@ from sqlalchemy import UniqueConstraint
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 
-app = Flask(__name__)
+@app.after_request
+def add_header(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
 
 # ==================== DATABASE CONFIG ====================
 DATABASE_URL = os.environ.get('DATABASE_URL')

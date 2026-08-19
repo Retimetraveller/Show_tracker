@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>VFX Show Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -707,10 +710,11 @@
 
     async function loadShowData() {
         if (!currentShowId) return;
+        const t = Date.now();
         const [seqRes, shotRes, artRes] = await Promise.all([
-            fetch(`/api/shows/${currentShowId}/sequences`),
-            fetch(`/api/shows/${currentShowId}/shots`),
-            fetch(`/api/shows/${currentShowId}/artists`)
+            fetch(`/api/shows/${currentShowId}/sequences?t=${t}`),
+            fetch(`/api/shows/${currentShowId}/shots?t=${t}`),
+            fetch(`/api/shows/${currentShowId}/artists?t=${t}`)
         ]);
         sequences = await seqRes.json();
         shots = await shotRes.json();
