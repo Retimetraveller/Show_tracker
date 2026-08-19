@@ -401,7 +401,7 @@ def create_sequence(show_id):
     log_action(show_id, f"Sequence '{seq.name}' added")
     return jsonify({"success": True, "id": seq.id})
 
-@app.route('/api/sequences/<int:seq_id>', methods(['PUT'])
+@app.route('/api/sequences/<int:seq_id>', methods=(['PUT'])
 def update_sequence(seq_id):
     seq = Sequence.query.get_or_404(seq_id)
     data = request.json
