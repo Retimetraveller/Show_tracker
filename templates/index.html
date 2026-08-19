@@ -398,6 +398,34 @@
             text-align: center;
             width: 40px;
         }
+        .spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-container {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text2);
+        }
+        .loading-container p {
+            margin-top: 12px;
+            font-size: 14px;
+        }
+        .toast-notification {
+            animation: slideInRight 0.3s ease;
+        }
+        @keyframes slideInRight {
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -909,9 +937,9 @@
     // ==================== REFRESH ====================
     function refreshShots() {
         document.getElementById('shotsContainer').innerHTML = `
-            <div style="text-align:center;padding:60px 20px;color:var(--text2);">
-                <div style="font-size:32px;margin-bottom:12px;">⏳</div>
-                <p>Loading shots...</p>
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <p>Refreshing shots...</p>
             </div>
         `;
         loadShowData().then(() => {
@@ -1002,23 +1030,57 @@
         if (!password) return;
         if (!confirm(`Delete ${selectedShotIds.size} selected shots?`)) return;
 
+        // Get the IDs of shots to delete
         const ids = Array.from(selectedShotIds);
-        const res = await fetch('/api/shots/bulk_delete', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({shot_ids: ids, password: password})
+        
+        // Store the deleted shot IDs so we can restore them if the API call fails
+        const deletedIds = new Set(ids);
+        
+        // 1. INSTANT UI UPDATE: Remove shots from local array and re-render
+        const deletedShots = [];
+        shots = shots.filter(s => {
+            if (deletedIds.has(s.id)) {
+                deletedShots.push(s);
+                return false;
+            }
+            return true;
         });
-        const data = await res.json();
-        if (data.error) {
-            alert(data.error);
-            return;
-        }
-        alert(`Deleted ${data.deleted} shots successfully!`);
+        
+        // Update total shot count in stats
+        document.getElementById('statShots').textContent = shots.length;
+        
+        // Clear selections and re-render
         selectedShotIds = new Set();
         clearAllSelections();
-        await loadShowData();
         renderShotsBySequence();
         updateBulkDeleteBar();
+        
+        // Show a quick toast notification (optional)
+        showToast(`Deleting ${deletedShots.length} shots...`, 'info');
+        
+        // 2. BACKGROUND SYNC: Send delete request to server
+        try {
+            const res = await fetch('/api/shots/bulk_delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({shot_ids: ids, password: password})
+            });
+            const data = await res.json();
+            if (data.error) {
+                // Restore shots if deletion failed
+                showToast(`Error: ${data.error}`, 'error');
+                // Restore shots
+                deletedShots.forEach(s => shots.push(s));
+                renderShotsBySequence();
+                return;
+            }
+            showToast(`Deleted ${data.deleted} shots successfully!`, 'success');
+        } catch (err) {
+            // Restore shots on network error
+            showToast('Network error, restoring shots...', 'error');
+            deletedShots.forEach(s => shots.push(s));
+            renderShotsBySequence();
+        }
     }
 
     // ==================== RENDER SHOTS BY SEQUENCE ====================
@@ -1028,8 +1090,8 @@
         // Show loading if no data yet
         if (!shots || shots.length === 0) {
             container.innerHTML = `
-                <div style="text-align:center;padding:60px 20px;color:var(--text2);">
-                    <div style="font-size:32px;margin-bottom:12px;">⏳</div>
+                <div class="loading-container">
+                    <div class="spinner"></div>
                     <p>Loading shots...</p>
                 </div>
             `;
@@ -1923,15 +1985,37 @@
         const password = prompt("Enter deletion password to confirm:");
         if (!password) return;
         if (!confirm('Delete this shot?')) return;
-        const res = await fetch(`/api/shots/${id}`, {
-            method: 'DELETE',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({password})
-        });
-        const data = await res.json();
-        if (data.error) { alert(data.error); return; }
-        await loadShowData();
-        loadShots();
+        
+        // Store the shot in case we need to restore it
+        const shotToDelete = shots.find(s => s.id === id);
+        if (!shotToDelete) return;
+        
+        // 1. INSTANT UI UPDATE
+        shots = shots.filter(s => s.id !== id);
+        document.getElementById('statShots').textContent = shots.length;
+        renderShotsBySequence();
+        showToast(`Deleting ${shotToDelete.name}...`, 'info');
+        
+        // 2. BACKGROUND SYNC
+        try {
+            const res = await fetch(`/api/shots/${id}`, {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({password})
+            });
+            const data = await res.json();
+            if (data.error) {
+                showToast(`Error: ${data.error}`, 'error');
+                shots.push(shotToDelete);
+                renderShotsBySequence();
+                return;
+            }
+            showToast(`Deleted ${shotToDelete.name} successfully!`, 'success');
+        } catch (err) {
+            showToast('Network error, restoring shot...', 'error');
+            shots.push(shotToDelete);
+            renderShotsBySequence();
+        }
     }
 
     // ==================== BULK SHOT MODAL ====================
@@ -2070,6 +2154,60 @@
         if (!iso) return '';
         const d = new Date(iso);
         return d.toLocaleDateString();
+    }
+
+    function showToast(message, type = 'info') {
+        // Remove existing toast
+        const oldToast = document.querySelector('.toast-notification');
+        if (oldToast) oldToast.remove();
+        
+        const colors = {
+            success: '#4ade80',
+            error: '#f87171',
+            info: '#60a5fa'
+        };
+        
+        const toast = document.createElement('div');
+        toast.className = 'toast-notification';
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 20px;
+            background: var(--surface);
+            border: 1px solid ${colors[type] || '#60a5fa'};
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: var(--shadow);
+            z-index: 9999;
+            animation: fadeIn 0.3s ease;
+            max-width: 400px;
+            backdrop-filter: blur(12px);
+        `;
+        toast.textContent = message;
+        
+        // Add a small indicator dot
+        const dot = document.createElement('span');
+        dot.style.cssText = `
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: ${colors[type] || '#60a5fa'};
+            margin-right: 10px;
+        `;
+        toast.prepend(dot);
+        
+        document.body.appendChild(toast);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 
     // Close modals on Escape
