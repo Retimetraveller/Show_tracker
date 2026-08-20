@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* ---------- existing styles ---------- */
         .seq-filter-btn {
             display: inline-block;
             padding: 6px 14px;
@@ -401,6 +402,8 @@
             text-align: center;
             width: 40px;
         }
+
+        /* ---------- LOADING SPINNER ---------- */
         .spinner {
             display: inline-block;
             width: 32px;
@@ -422,6 +425,8 @@
             margin-top: 12px;
             font-size: 14px;
         }
+
+        /* ---------- TOAST ---------- */
         .toast-notification {
             animation: slideInRight 0.3s ease;
         }
@@ -433,6 +438,7 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- Header -->
         <header class="app-header">
             <div class="logo">
                 <span class="logo-icon">&#127909;</span>
@@ -488,7 +494,7 @@
                     </button>
                 </nav>
 
-                <!-- Dashboard Tab -->
+                <!-- Dashboard -->
                 <div class="tab-panel active" id="panel-dashboard">
                     <div class="stats-grid">
                         <div class="stat-card"><div class="stat-value" id="statShots">0</div><div class="stat-label">Total Shots</div></div>
@@ -504,13 +510,13 @@
                     <div class="show-info-card"><h3>Show Info</h3><div class="info-grid" id="showInfoGrid"></div></div>
                 </div>
 
-                <!-- Sequences Tab -->
+                <!-- Sequences -->
                 <div class="tab-panel" id="panel-sequences">
                     <div class="section-header"><h2>Sequences</h2><button class="btn btn-primary" onclick="openAddSequenceModal()">+ Add Sequence</button></div>
                     <div class="table-container"><table class="data-table" id="sequencesTable"><thead><tr><th>Name</th><th>Description</th><th>Shots</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                 </div>
 
-                <!-- Shots Tab -->
+                <!-- Shots -->
                 <div class="tab-panel" id="panel-shots">
                     <div class="section-header">
                         <h2>Shots</h2>
@@ -544,17 +550,17 @@
                         <select class="filter-select" id="filterDepartment" onchange="filterShots()"><option value="">All Departments</option><option>Animation</option><option>Modeling</option><option>Layout</option><option>Matchmove</option><option>Roto</option><option>Paint</option><option>CFX</option><option>Groom</option><option>RotoAnim</option><option>Lighting</option><option>Compositing</option><option>FX</option></select>
                     </div>
                     <div id="shotsContainer">
-                        <!-- Shots will be rendered here -->
+                        <!-- Shots rendered here -->
                     </div>
                 </div>
 
-                <!-- Artists Tab -->
+                <!-- Artists -->
                 <div class="tab-panel" id="panel-artists">
                     <div class="section-header"><h2>Artists</h2><button class="btn btn-primary" onclick="openAddArtistModal()">+ Add Artist</button></div>
                     <div class="table-container"><table class="data-table" id="artistsTable"><thead><tr><th>Name</th><th>Department</th><th>Role</th><th>Email</th><th>Phone</th><th>Rate</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
                 </div>
 
-                <!-- Client Updates Tab -->
+                <!-- Client Updates -->
                 <div class="tab-panel" id="panel-client_updates">
                     <div class="section-header"><h2>Client Updates</h2></div>
                     <div class="stats-grid" id="clientStats" style="grid-template-columns:repeat(4,1fr);">
@@ -571,7 +577,7 @@
                     <div class="table-container"><table class="data-table" id="clientTable"><thead><tr><th>Shot Name</th><th>Sequence</th><th>Internal Status</th><th>Client Status</th><th>Client Notes</th><th>Sent Date</th></tr></thead><tbody id="clientTableBody"></tbody></table></div>
                 </div>
 
-                <!-- Department View Tab -->
+                <!-- Department View -->
                 <div class="tab-panel" id="panel-department">
                     <div class="section-header"><h2 id="deptTitle">Department View</h2></div>
                     <div class="filters-bar">
@@ -583,13 +589,13 @@
                     <div class="table-container"><table class="data-table" id="deptTable"><thead><tr><th>Shot Name</th><th>Sequence</th><th>Status</th><th>Priority</th><th>Assigned To</th><th>Client Status</th></tr></thead><tbody id="deptTableBody"></tbody></table></div>
                 </div>
 
-                <!-- Playlists Tab -->
+                <!-- Playlists -->
                 <div class="tab-panel" id="panel-playlists">
                     <div class="section-header"><h2>Playlists</h2><button class="btn btn-primary" onclick="openCreatePlaylistModal()">+ Create Playlist</button></div>
                     <div id="playlistContent"><div style="text-align:center;padding:40px;color:var(--text2);">Loading playlists...</div></div>
                 </div>
 
-                <!-- Kanban Tab -->
+                <!-- Kanban -->
                 <div class="tab-panel" id="panel-kanban">
                     <div class="kanban-board-container">
                         <div class="kanban-filters">
@@ -605,7 +611,7 @@
                     </div>
                 </div>
 
-                <!-- Reports Tab -->
+                <!-- Reports -->
                 <div class="tab-panel" id="panel-reports">
                     <div class="section-header"><h2>Reports & Export</h2></div>
                     <div class="reports-grid">
@@ -666,6 +672,43 @@
     const STATUS_COLORS = { "Not Started": "#6b7280", "WIP": "#fbbf24", "Review": "#60a5fa", "Approved": "#4ade80", "On Hold": "#f87171", "Omit": "#888888" };
     const STATUS_BG_COLORS = { "Not Started": "rgba(107,114,128,0.15)", "WIP": "rgba(251,191,36,0.15)", "Review": "rgba(96,165,250,0.15)", "Approved": "rgba(74,222,128,0.15)", "On Hold": "rgba(248,113,113,0.15)", "Omit": "rgba(136,136,136,0.15)" };
     const CLIENT_STATUS_COLORS = { "Not Sent": "#6b7280", "Pending": "#fbbf24", "Approved": "#4ade80", "Changes Requested": "#f87171", "Retake": "#fb923c" };
+
+    // ==================== TOAST ====================
+    function showToast(message, type = 'info') {
+        const oldToast = document.querySelector('.toast-notification');
+        if (oldToast) oldToast.remove();
+        const colors = { success: '#4ade80', error: '#f87171', info: '#60a5fa' };
+        const toast = document.createElement('div');
+        toast.className = 'toast-notification';
+        toast.style.cssText = `
+            position: fixed; bottom: 24px; right: 24px;
+            padding: 12px 20px;
+            background: var(--surface);
+            border: 1px solid ${colors[type] || '#60a5fa'};
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: var(--shadow);
+            z-index: 9999;
+            animation: fadeIn 0.3s ease;
+            max-width: 400px;
+            backdrop-filter: blur(12px);
+        `;
+        toast.textContent = message;
+        const dot = document.createElement('span');
+        dot.style.cssText = `
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            background: ${colors[type] || '#60a5fa'}; margin-right: 10px;
+        `;
+        toast.prepend(dot);
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
 
     // ==================== INIT ====================
     document.addEventListener('DOMContentLoaded', () => {
@@ -1034,64 +1077,29 @@
         if (!password) return;
         if (!confirm(`Delete ${selectedShotIds.size} selected shots?`)) return;
 
-        // Get the IDs of shots to delete
         const ids = Array.from(selectedShotIds);
-        
-        // Store the deleted shot IDs so we can restore them if the API call fails
-        const deletedIds = new Set(ids);
-        
-        // 1. INSTANT UI UPDATE: Remove shots from local array and re-render
-        const deletedShots = [];
-        shots = shots.filter(s => {
-            if (deletedIds.has(s.id)) {
-                deletedShots.push(s);
-                return false;
-            }
-            return true;
+        const res = await fetch('/api/shots/bulk_delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({shot_ids: ids, password: password})
         });
-        
-        // Update total shot count in stats
-        document.getElementById('statShots').textContent = shots.length;
-        
-        // Clear selections and re-render
+        const data = await res.json();
+        if (data.error) {
+            showToast(data.error, 'error');
+            return;
+        }
+        showToast(`Deleted ${data.deleted} shots successfully!`, 'success');
         selectedShotIds = new Set();
         clearAllSelections();
+        await loadShowData();
         renderShotsBySequence();
         updateBulkDeleteBar();
-        
-        // Show a quick toast notification (optional)
-        showToast(`Deleting ${deletedShots.length} shots...`, 'info');
-        
-        // 2. BACKGROUND SYNC: Send delete request to server
-        try {
-            const res = await fetch('/api/shots/bulk_delete', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({shot_ids: ids, password: password})
-            });
-            const data = await res.json();
-            if (data.error) {
-                // Restore shots if deletion failed
-                showToast(`Error: ${data.error}`, 'error');
-                // Restore shots
-                deletedShots.forEach(s => shots.push(s));
-                renderShotsBySequence();
-                return;
-            }
-            showToast(`Deleted ${data.deleted} shots successfully!`, 'success');
-        } catch (err) {
-            // Restore shots on network error
-            showToast('Network error, restoring shots...', 'error');
-            deletedShots.forEach(s => shots.push(s));
-            renderShotsBySequence();
-        }
     }
 
     // ==================== RENDER SHOTS BY SEQUENCE ====================
     function renderShotsBySequence() {
         const container = document.getElementById('shotsContainer');
 
-        // Show loading if no data yet
         if (!shots || shots.length === 0) {
             container.innerHTML = `
                 <div class="loading-container">
@@ -1989,37 +1997,15 @@
         const password = prompt("Enter deletion password to confirm:");
         if (!password) return;
         if (!confirm('Delete this shot?')) return;
-        
-        // Store the shot in case we need to restore it
-        const shotToDelete = shots.find(s => s.id === id);
-        if (!shotToDelete) return;
-        
-        // 1. INSTANT UI UPDATE
-        shots = shots.filter(s => s.id !== id);
-        document.getElementById('statShots').textContent = shots.length;
-        renderShotsBySequence();
-        showToast(`Deleting ${shotToDelete.name}...`, 'info');
-        
-        // 2. BACKGROUND SYNC
-        try {
-            const res = await fetch(`/api/shots/${id}`, {
-                method: 'DELETE',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({password})
-            });
-            const data = await res.json();
-            if (data.error) {
-                showToast(`Error: ${data.error}`, 'error');
-                shots.push(shotToDelete);
-                renderShotsBySequence();
-                return;
-            }
-            showToast(`Deleted ${shotToDelete.name} successfully!`, 'success');
-        } catch (err) {
-            showToast('Network error, restoring shot...', 'error');
-            shots.push(shotToDelete);
-            renderShotsBySequence();
-        }
+        const res = await fetch(`/api/shots/${id}`, {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password})
+        });
+        const data = await res.json();
+        if (data.error) { alert(data.error); return; }
+        await loadShowData();
+        loadShots();
     }
 
     // ==================== BULK SHOT MODAL ====================
@@ -2078,18 +2064,30 @@
             deadline: document.getElementById('bulkDeadline').value
         };
         if (!data.pattern || !data.count) { alert('Pattern and count are required'); return; }
-        const res = await fetch(`/api/shows/${currentShowId}/shots/bulk`, {
-            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
-        });
-        const result = await res.json();
-        if (!result.success) {
-            alert(result.error || 'Failed to create shots');
-            return;
+
+        try {
+            const res = await fetch(`/api/shows/${currentShowId}/shots/bulk`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (!result.success) {
+                alert(result.error || 'Failed to create shots');
+                return;
+            }
+
+            showToast(`Created ${result.created} shots successfully!`, 'success');
+            closeModal('bulkShotModal');
+
+            // Force a full refresh of the shot data
+            await loadShowData();
+            renderShotsBySequence();
+            updateBulkDeleteBar();
+
+        } catch (err) {
+            alert('Network error: ' + err.message);
         }
-        alert(`Created ${result.created} shots successfully!`);
-        closeModal('bulkShotModal');
-        await loadShowData();
-        loadShots();
     }
 
     // ==================== ARTIST MODAL ====================
@@ -2158,60 +2156,6 @@
         if (!iso) return '';
         const d = new Date(iso);
         return d.toLocaleDateString();
-    }
-
-    function showToast(message, type = 'info') {
-        // Remove existing toast
-        const oldToast = document.querySelector('.toast-notification');
-        if (oldToast) oldToast.remove();
-        
-        const colors = {
-            success: '#4ade80',
-            error: '#f87171',
-            info: '#60a5fa'
-        };
-        
-        const toast = document.createElement('div');
-        toast.className = 'toast-notification';
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            padding: 12px 20px;
-            background: var(--surface);
-            border: 1px solid ${colors[type] || '#60a5fa'};
-            border-radius: var(--radius-sm);
-            color: var(--text);
-            font-size: 14px;
-            font-weight: 500;
-            box-shadow: var(--shadow);
-            z-index: 9999;
-            animation: fadeIn 0.3s ease;
-            max-width: 400px;
-            backdrop-filter: blur(12px);
-        `;
-        toast.textContent = message;
-        
-        // Add a small indicator dot
-        const dot = document.createElement('span');
-        dot.style.cssText = `
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: ${colors[type] || '#60a5fa'};
-            margin-right: 10px;
-        `;
-        toast.prepend(dot);
-        
-        document.body.appendChild(toast);
-        
-        // Auto-remove after 3 seconds
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transition = 'opacity 0.3s ease';
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
     }
 
     // Close modals on Escape
