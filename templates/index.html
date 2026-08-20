@@ -1531,6 +1531,7 @@
         });
         const data = await res.json();
         if (data.success) {
+            showToast(`Playlist "${name}" created!`, 'success');
             closeModal('createPlaylistModal');
             await loadPlaylists();
         }
@@ -1567,6 +1568,7 @@
                 shot_ids: selected
             })
         });
+        showToast(`Shots added to playlist!`, 'success');
         closeModal('addShotsModal');
         await loadPlaylists();
         openPlaylistDetail(currentPlaylistId);
@@ -1584,6 +1586,7 @@
         });
         const data = await res.json();
         if (data.error) { alert(data.error); return; }
+        showToast('Playlist deleted!', 'success');
         await loadPlaylists();
         currentPlaylistId = null;
     }
@@ -1842,10 +1845,16 @@
         if (!data.name) { alert('Show name is required'); return; }
         const url = editingId ? `/api/shows/${editingId}` : '/api/shows';
         const method = editingId ? 'PUT' : 'POST';
-        await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
-        closeModal('showModal');
-        await loadShows();
-        if (editingId) selectShow(editingId);
+        const res = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+        const result = await res.json();
+        if (result.success) {
+            showToast(`Show "${data.name}" ${editingId ? 'updated' : 'created'}!`, 'success');
+            closeModal('showModal');
+            await loadShows();
+            if (editingId) selectShow(editingId);
+        } else {
+            alert(result.error || 'Failed to save show');
+        }
     }
     async function deleteShow(id) {
         const password = prompt("Enter deletion password to confirm:");
@@ -1858,6 +1867,7 @@
         });
         const data = await res.json();
         if (data.error) { alert(data.error); return; }
+        showToast('Show deleted!', 'success');
         currentShowId = null;
         await loadShows();
         if (shows.length === 0) {
@@ -1888,10 +1898,16 @@
         if (!data.name) { alert('Sequence name is required'); return; }
         const url = editingId ? `/api/sequences/${editingId}` : `/api/shows/${currentShowId}/sequences`;
         const method = editingId ? 'PUT' : 'POST';
-        await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
-        closeModal('sequenceModal');
-        await loadShowData();
-        loadSequences();
+        const res = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+        const result = await res.json();
+        if (result.success) {
+            showToast(`Sequence "${data.name}" ${editingId ? 'updated' : 'added'}!`, 'success');
+            closeModal('sequenceModal');
+            await loadShowData();
+            loadSequences();
+        } else {
+            alert(result.error || 'Failed to save sequence');
+        }
     }
     async function deleteSequence(id) {
         const password = prompt("Enter deletion password to confirm:");
@@ -1904,6 +1920,7 @@
         });
         const data = await res.json();
         if (data.error) { alert(data.error); return; }
+        showToast('Sequence deleted!', 'success');
         await loadShowData();
         loadSequences();
     }
@@ -1989,6 +2006,7 @@
             alert(result.error || 'Failed to save shot');
             return;
         }
+        showToast(`Shot "${data.name}" ${editingId ? 'updated' : 'added'}!`, 'success');
         closeModal('shotModal');
         await loadShowData();
         loadShots();
@@ -2004,6 +2022,7 @@
         });
         const data = await res.json();
         if (data.error) { alert(data.error); return; }
+        showToast('Shot deleted!', 'success');
         await loadShowData();
         loadShots();
     }
@@ -2080,7 +2099,6 @@
             showToast(`Created ${result.created} shots successfully!`, 'success');
             closeModal('bulkShotModal');
 
-            // Force a full refresh of the shot data
             await loadShowData();
             renderShotsBySequence();
             updateBulkDeleteBar();
@@ -2127,10 +2145,16 @@
         if (!data.name) { alert('Artist name is required'); return; }
         const url = editingId ? `/api/artists/${editingId}` : `/api/shows/${currentShowId}/artists`;
         const method = editingId ? 'PUT' : 'POST';
-        await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
-        closeModal('artistModal');
-        await loadShowData();
-        loadArtists();
+        const res = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+        const result = await res.json();
+        if (result.success) {
+            showToast(`Artist "${data.name}" ${editingId ? 'updated' : 'added'}!`, 'success');
+            closeModal('artistModal');
+            await loadShowData();
+            loadArtists();
+        } else {
+            alert(result.error || 'Failed to save artist');
+        }
     }
     async function deleteArtist(id) {
         const password = prompt("Enter deletion password to confirm:");
@@ -2143,6 +2167,7 @@
         });
         const data = await res.json();
         if (data.error) { alert(data.error); return; }
+        showToast('Artist deleted!', 'success');
         await loadShowData();
         loadArtists();
     }
