@@ -2,16 +2,26 @@ services:
   - type: web
     name: vfx-tracker
     runtime: python
-    pythonVersion: 3.12.7   # <-- ADD THIS LINE
+    pythonVersion: 3.12.7
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: vfx-db
-          property: connectionString
+      # DATABASE_URL is NOT set here on purpose.
+      # Set it manually in the Render dashboard (Environment tab) to your
+      # Neon connection string. Render used to auto-provision its own
+      # Postgres database below and inject ITS connection string as
+      # DATABASE_URL on every deploy from this blueprint -- that silently
+      # overwrote the Neon URL and pointed the app at a separate, empty
+      # database. That is the most likely cause of shots/shows appearing
+      # to "reset": the app was writing to Neon in one deploy and reading
+      # from the Render-managed DB (or vice versa) in the next.
       - key: SECRET_KEY
         generateValue: true
-databases:
-  - name: vfx-db
-    plan: free
+      - key: DELETION_PASSWORD
+        sync: false   # set manually in the Render dashboard; do not commit it
+      - key: APP_PASSWORD
+        sync: false   # shared studio login password; set manually in the Render dashboard
+# No `databases:` block -- this project uses an external Neon Postgres
+# database, not a Render-managed one. Do not re-add a `databases:` entry
+# unless you intend to move off Neon; doing so will re-create the bug
+# above (fromDatabase overwrites DATABASE_URL on every deploy).

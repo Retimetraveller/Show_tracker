@@ -4,7 +4,7 @@ import io
 import re
 import json
 import uuid
-from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import UniqueConstraint
 from datetime import datetime, timedelta
@@ -13,20 +13,47 @@ from werkzeug.utils import secure_filename
 # ==================== CREATE FLASK APP ====================
 app = Flask(__name__)
 
-# ==================== DISABLE CACHING ====================
+# ==================== CACHING ====================
+# Previously this disabled caching for EVERY response, including static
+# CSS/JS/images under /static/ -- so the browser re-downloaded the full
+# stylesheet and every uploaded thumbnail on every single page navigation.
+# That's a direct hit on "make it faster". Data endpoints (pages, /api/*)
+# still get no-store so shot/show data is always fresh; static assets now
+# get a real cache lifetime with a hash-friendly revalidation setup.
 @app.after_request
 def add_header(response):
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '-1'
+    if request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+    else:
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '-1'
     return response
 
 # ==================== DATABASE CONFIG ====================
+# IS_PRODUCTION controls whether we allow a silent SQLite fallback.
+# On Render, RENDER is always set in the environment. Locally it isn't,
+# so local dev without DATABASE_URL still works against SQLite.
+IS_PRODUCTION = bool(os.environ.get('RENDER'))
+
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+elif IS_PRODUCTION:
+    # Refuse to boot with a silent SQLite fallback in production. A prior
+    # version of this app fell back to a local SQLite file whenever
+    # DATABASE_URL was missing/misconfigured -- on Render's ephemeral disk
+    # that file is wiped on every deploy/restart, which is why shots
+    # appeared to "reset". Failing loudly here is intentional: it is much
+    # easier to notice a crashed deploy than data that silently vanished.
+    raise RuntimeError(
+        "DATABASE_URL is not set. Refusing to start in production with a "
+        "SQLite fallback, since that database does not persist across "
+        "deploys/restarts on Render. Set DATABASE_URL in the Render "
+        "dashboard to your Neon connection string."
+    )
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -34,7 +61,32 @@ else:
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(DATA_DIR, "shows.db").replace(chr(92), "/")}'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vfx-tracker-secret-key-2026')
+
+# Connection pool settings: Neon's free tier suspends its compute after a
+# period of idle activity and closes connections. Without pool_pre_ping,
+# SQLAlchemy will hand out a dead connection from the pool and the write
+# fails (often surfacing to the user as "save button does nothing").
+# pool_recycle proactively drops connections before Neon can kill them.
+if DATABASE_URL:
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 280,
+    }
+_secret_key = os.environ.get('SECRET_KEY')
+if not _secret_key:
+    if IS_PRODUCTION:
+        raise RuntimeError(
+            "SECRET_KEY is not set. render.yaml generates one automatically "
+            "(generateValue: true) -- if you're seeing this, check the "
+            "Render dashboard Environment tab."
+        )
+    _secret_key = 'dev-only-secret-key'  # local dev convenience only
+app.config['SECRET_KEY'] = _secret_key
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=14)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+if IS_PRODUCTION:
+    app.config['SESSION_COOKIE_SECURE'] = True  # cookie only sent over HTTPS in production
 
 # File upload config
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
@@ -69,7 +121,7 @@ class Show(db.Model):
 class Sequence(db.Model):
     __tablename__ = 'sequences'
     id = db.Column(db.Integer, primary_key=True)
-    show_id = db.Column(db.Integer, db.ForeignKey('shows.id'), nullable=False)
+    show_id = db.Column(db.Integer, db.ForeignKey('shows.id'), nullable=False, index=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
     created_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
@@ -77,7 +129,7 @@ class Sequence(db.Model):
 class Artist(db.Model):
     __tablename__ = 'artists'
     id = db.Column(db.Integer, primary_key=True)
-    show_id = db.Column(db.Integer, db.ForeignKey('shows.id'), nullable=False)
+    show_id = db.Column(db.Integer, db.ForeignKey('shows.id'), nullable=False, index=True)
     name = db.Column(db.String(200), nullable=False)
     department = db.Column(db.String(100))
     email = db.Column(db.String(200))
@@ -89,20 +141,20 @@ class Artist(db.Model):
 class Shot(db.Model):
     __tablename__ = 'shots'
     id = db.Column(db.Integer, primary_key=True)
-    show_id = db.Column(db.Integer, db.ForeignKey('shows.id'), nullable=False)
-    sequence_id = db.Column(db.Integer, db.ForeignKey('sequences.id'))
+    show_id = db.Column(db.Integer, db.ForeignKey('shows.id'), nullable=False, index=True)
+    sequence_id = db.Column(db.Integer, db.ForeignKey('sequences.id'), index=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
     shot_type = db.Column(db.String(100))
     frames = db.Column(db.String(50))
     duration = db.Column(db.String(50))
-    status = db.Column(db.String(50), default='Not Started')
+    status = db.Column(db.String(50), default='Not Started', index=True)
     priority = db.Column(db.String(50), default='Normal')
-    assigned_to = db.Column(db.String(200))
+    assigned_to = db.Column(db.String(200), index=True)
     notes = db.Column(db.Text)
     created_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
     updated_at = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
-    client_status = db.Column(db.String(50), default='Not Sent')
+    client_status = db.Column(db.String(50), default='Not Sent', index=True)
     client_notes = db.Column(db.Text)
     client_sent_date = db.Column(db.String(50))
     client_approved_date = db.Column(db.String(50))
@@ -117,7 +169,7 @@ class Shot(db.Model):
 class Task(db.Model):
     __tablename__ = 'tasks'
     id = db.Column(db.Integer, primary_key=True)
-    shot_id = db.Column(db.Integer, db.ForeignKey('shots.id'), nullable=False)
+    shot_id = db.Column(db.Integer, db.ForeignKey('shots.id'), nullable=False, index=True)
     name = db.Column(db.String(100), nullable=False)
     status = db.Column(db.String(50), default='Not Started')
     assigned_to = db.Column(db.String(200))
@@ -128,7 +180,7 @@ class Task(db.Model):
 class Playlist(db.Model):
     __tablename__ = 'playlists'
     id = db.Column(db.Integer, primary_key=True)
-    show_id = db.Column(db.Integer, db.ForeignKey('shows.id'), nullable=False)
+    show_id = db.Column(db.Integer, db.ForeignKey('shows.id'), nullable=False, index=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
     shot_ids = db.Column(db.Text)
@@ -137,7 +189,7 @@ class Playlist(db.Model):
 class History(db.Model):
     __tablename__ = 'history'
     id = db.Column(db.Integer, primary_key=True)
-    show_id = db.Column(db.Integer, db.ForeignKey('shows.id'))
+    show_id = db.Column(db.Integer, db.ForeignKey('shows.id'), index=True)
     action = db.Column(db.String(500))
     timestamp = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
 
@@ -230,6 +282,19 @@ def get_client_visible_shots(show_id):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def check_deletion_password(supplied_password):
+    """Returns True if supplied_password matches the configured deletion
+    password. Fails closed: if DELETION_PASSWORD isn't set in production,
+    every delete is rejected rather than silently accepting the old
+    hardcoded default ('default-password-change-me'), which anyone reading
+    the public source could have used to delete any show."""
+    configured = os.environ.get('DELETION_PASSWORD')
+    if not configured:
+        if IS_PRODUCTION:
+            return False
+        configured = 'dev-only-password'  # local dev convenience only
+    return bool(supplied_password) and supplied_password == configured
+
 def get_deadline_status(delivery_date):
     if not delivery_date:
         return {"status": "unknown", "days": 0, "color": "#6b7280", "label": "No deadline"}
@@ -249,6 +314,49 @@ def get_deadline_status(delivery_date):
             return {"status": "good", "days": days, "color": "#4ade80", "label": f"{days}d left"}
     except:
         return {"status": "unknown", "days": 0, "color": "#6b7280", "label": "Invalid date"}
+
+# =============================================================================
+# AUTH - SIMPLE SHARED-PASSWORD GATE
+# =============================================================================
+# Previously the entire site (every page and API route) was open to anyone
+# with the URL -- there was no login, so this adds one shared-password
+# session gate for the whole studio. This is intentionally simple: one
+# password, one session cookie, no per-user accounts, matching how a small
+# single-studio internal tool is actually used.
+
+APP_PASSWORD = os.environ.get('APP_PASSWORD')
+
+def auth_enabled():
+    return bool(APP_PASSWORD)
+
+@app.before_request
+def require_login():
+    if not auth_enabled():
+        return  # no APP_PASSWORD configured -> auth gate is off (e.g. local dev)
+    if request.endpoint in ('login', 'static', 'uploaded_file'):
+        return
+    if request.path == '/health':
+        return
+    if not session.get('authed'):
+        if request.path.startswith('/api/'):
+            return jsonify({"success": False, "error": "Not authenticated"}), 401
+        return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        if request.form.get('password') == APP_PASSWORD:
+            session['authed'] = True
+            session.permanent = True
+            return redirect(url_for('index'))
+        error = 'Incorrect password'
+    return render_template('login.html', error=error)
+
+@app.route('/logout')
+def logout():
+    session.pop('authed', None)
+    return redirect(url_for('login'))
 
 # =============================================================================
 # ROUTES - MAIN PAGES
@@ -354,16 +462,23 @@ def update_show(show_id):
 def delete_show(show_id):
     data = request.json
     password = data.get('password', '')
-    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+    if not check_deletion_password(password):
         return jsonify({"success": False, "error": "Incorrect password"}), 403
     show = Show.query.get_or_404(show_id)
     name = show.name
+    # Bug fix: this used to run Task.query.filter_by(shot_id=show_id),
+    # which compares a task's shot_id against a *show* id -- two different
+    # id spaces that don't correspond. That left every task belonging to
+    # this show's shots un-deleted (orphaned rows referencing a shot_id
+    # that no longer exists once the shots below are removed).
+    shot_ids = [s.id for s in Shot.query.filter_by(show_id=show_id).with_entities(Shot.id).all()]
+    if shot_ids:
+        Task.query.filter(Task.shot_id.in_(shot_ids)).delete(synchronize_session=False)
     Shot.query.filter_by(show_id=show_id).delete()
     Sequence.query.filter_by(show_id=show_id).delete()
     Artist.query.filter_by(show_id=show_id).delete()
     History.query.filter_by(show_id=show_id).delete()
     Playlist.query.filter_by(show_id=show_id).delete()
-    Task.query.filter_by(shot_id=show_id).delete()
     db.session.delete(show)
     db.session.commit()
     return jsonify({"success": True})
@@ -415,7 +530,7 @@ def update_sequence(seq_id):
 def delete_sequence(seq_id):
     data = request.json
     password = data.get('password', '')
-    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+    if not check_deletion_password(password):
         return jsonify({"success": False, "error": "Incorrect password"}), 403
     seq = Sequence.query.get_or_404(seq_id)
     show_id = seq.show_id
@@ -469,7 +584,7 @@ def update_artist(artist_id):
 def delete_artist(artist_id):
     data = request.json
     password = data.get('password', '')
-    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+    if not check_deletion_password(password):
         return jsonify({"success": False, "error": "Incorrect password"}), 403
     artist = Artist.query.get_or_404(artist_id)
     show_id = artist.show_id
@@ -606,7 +721,7 @@ def update_shot(shot_id):
 def delete_shot(shot_id):
     data = request.json
     password = data.get('password', '')
-    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+    if not check_deletion_password(password):
         return jsonify({"success": False, "error": "Incorrect password"}), 403
     shot = Shot.query.get_or_404(shot_id)
     show_id = shot.show_id
@@ -622,7 +737,7 @@ def bulk_delete_shots():
     data = request.json
     shot_ids = data.get('shot_ids', [])
     password = data.get('password', '')
-    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+    if not check_deletion_password(password):
         return jsonify({"success": False, "error": "Incorrect password"}), 403
     if not shot_ids:
         return jsonify({"success": False, "error": "No shots selected"}), 400
@@ -774,17 +889,33 @@ def delete_task(task_id):
 @app.route('/api/kanban/<int:show_id>', methods=['GET'])
 def get_kanban(show_id):
     sequence_filter = request.args.get('sequence', type=int)
-    
+
     query = Shot.query.filter_by(show_id=show_id)
     if sequence_filter:
         query = query.filter_by(sequence_id=sequence_filter)
-    
+
     shots = query.all()
-    
+
+    # Previously this ran 2 extra queries per shot (Task.query.filter_by
+    # .count() x2), so a 200-shot board fired 400+ queries against Neon on
+    # every kanban load -- the main reason this page felt slow. Instead,
+    # pull all task counts for these shots in two aggregate queries total.
+    shot_ids = [s.id for s in shots]
+    task_counts = {}
+    done_counts = {}
+    if shot_ids:
+        from sqlalchemy import func
+        for shot_id, cnt in db.session.query(Task.shot_id, func.count(Task.id)) \
+                .filter(Task.shot_id.in_(shot_ids)).group_by(Task.shot_id).all():
+            task_counts[shot_id] = cnt
+        for shot_id, cnt in db.session.query(Task.shot_id, func.count(Task.id)) \
+                .filter(Task.shot_id.in_(shot_ids), Task.status == 'Done').group_by(Task.shot_id).all():
+            done_counts[shot_id] = cnt
+
     columns = {}
     for status in STATUSES:
         columns[status] = []
-    
+
     for shot in shots:
         if shot.status in columns:
             deadline_info = get_deadline_status(shot.deadline)
@@ -803,10 +934,10 @@ def get_kanban(show_id):
                 "used_days": shot.used_days,
                 "deadline": shot.deadline,
                 "deadline_status": deadline_info,
-                "task_count": Task.query.filter_by(shot_id=shot.id).count(),
-                "tasks_done": Task.query.filter_by(shot_id=shot.id, status='Done').count()
+                "task_count": task_counts.get(shot.id, 0),
+                "tasks_done": done_counts.get(shot.id, 0)
             })
-    
+
     return jsonify(columns)
 
 @app.route('/api/kanban/move', methods=['POST'])
@@ -887,7 +1018,7 @@ def update_playlist(playlist_id):
 def delete_playlist(playlist_id):
     data = request.json
     password = data.get('password', '')
-    if password != os.environ.get('DELETION_PASSWORD', 'default-password-change-me'):
+    if not check_deletion_password(password):
         return jsonify({"success": False, "error": "Incorrect password"}), 403
     playlist = Playlist.query.get_or_404(playlist_id)
     db.session.delete(playlist)
@@ -997,6 +1128,25 @@ def debug_db():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/health')
+def health():
+    """Reports which database engine/host the app is actually connected
+    to, and basic row counts. Use this to verify Render is pointed at
+    Neon and not an empty fallback DB after any deploy."""
+    try:
+        engine_url = db.engine.url
+        db.session.execute(db.text('SELECT 1'))
+        return jsonify({
+            "status": "ok",
+            "db_driver": engine_url.drivername,
+            "db_host": engine_url.host or "local-file",
+            "db_name": engine_url.database,
+            "shows_count": Show.query.count(),
+            "shots_count": Shot.query.count(),
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 # =============================================================================
 # INIT - CREATE TABLES ON STARTUP

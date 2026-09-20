@@ -667,6 +667,46 @@
     let sortColumn = 'name';
     let sortDirection = 'asc';
     let selectedShotIds = new Set();
+
+    // ==================== SAFE FETCH ====================
+    // Every save/delete in this app used to call fetch() directly with no
+    // try/catch. If the server errored, timed out, or (on Neon) returned a
+    // dead-connection failure, res.json() would throw and the promise
+    // rejected with nothing shown to the user -- the button just looked
+    // like it did nothing. This wrapper always resolves to a predictable
+    // {success, data, error} shape so callers can show a real error.
+    async function apiRequest(url, options) {
+        let res;
+        try {
+            res = await fetch(url, options);
+        } catch (networkErr) {
+            return { success: false, error: 'Network error: could not reach the server. Check your connection and try again.' };
+        }
+        let body = null;
+        try {
+            body = await res.json();
+        } catch (parseErr) {
+            return { success: false, error: `Server returned an unexpected response (status ${res.status}). Please try again.` };
+        }
+        if (!res.ok && body && body.success === undefined) {
+            // Error responses that don't set success:false explicitly (e.g. 403/404/500 handlers)
+            return { success: false, error: body.error || `Request failed (status ${res.status})` };
+        }
+        return body;
+    }
+
+    // Disables a button, runs an async action, and always re-enables it
+    // (even on error) so a failed save never leaves the UI stuck.
+    async function withButtonLock(buttonId, action) {
+        const btn = buttonId ? document.getElementById(buttonId) : null;
+        const originalText = btn ? btn.textContent : null;
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+        try {
+            await action();
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = originalText; }
+        }
+    }
     let lastSelectedIndex = -1;
 
     const STATUS_COLORS = { "Not Started": "#6b7280", "WIP": "#fbbf24", "Review": "#60a5fa", "Approved": "#4ade80", "On Hold": "#f87171", "Omit": "#888888" };
@@ -1274,22 +1314,37 @@
 
     // ==================== API CALLS ====================
     async function updateShotStatus(shotId, status) {
-        await fetch(`/api/shots/${shotId}/status`, {
+        // Previously this updated the local shots array unconditionally,
+        // even if the PATCH request failed silently (e.g. a dropped Neon
+        // connection). That made the UI show a status change that was
+        // never actually saved -- looking exactly like data "reverting"
+        // on next reload. Now we verify success first.
+        const result = await apiRequest(`/api/shots/${shotId}/status`, {
             method: 'PATCH',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({status})
         });
+        if (!result.success) {
+            showToast(result.error || 'Failed to save status change. Please try again.', 'error');
+            renderShotsBySequence(); // revert the dropdown to the real saved value
+            return;
+        }
         const shot = shots.find(s => s.id === shotId);
         if (shot) shot.status = status;
         renderShotsBySequence();
     }
 
     async function updateClientStatus(shotId, clientStatus) {
-        await fetch(`/api/shots/${shotId}/client_status`, {
+        const result = await apiRequest(`/api/shots/${shotId}/client_status`, {
             method: 'PATCH',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({client_status: clientStatus})
         });
+        if (!result.success) {
+            showToast(result.error || 'Failed to save client status. Please try again.', 'error');
+            renderShotsBySequence();
+            return;
+        }
         const shot = shots.find(s => s.id === shotId);
         if (shot) shot.client_status = clientStatus;
         renderShotsBySequence();
@@ -1785,7 +1840,15 @@
 
     // ==================== MODALS ====================
     function openModal(id) { document.getElementById(id).classList.add('active'); document.body.style.overflow = 'hidden'; }
-    function closeModal(id) { document.getElementById(id).classList.remove('active'); document.body.style.overflow = ''; }
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+        document.body.style.overflow = '';
+        // Reset shared editing state on every close (Cancel, X, or after a
+        // successful save) so a stale editingId/editingType can never leak
+        // into the next unrelated save.
+        editingId = null;
+        editingType = null;
+    }
 
     // ==================== SHOW MODAL ====================
     function openAddShowModal() {
@@ -1843,18 +1906,20 @@
             notes: document.getElementById('showNotes').value
         };
         if (!data.name) { alert('Show name is required'); return; }
-        const url = editingId ? `/api/shows/${editingId}` : '/api/shows';
-        const method = editingId ? 'PUT' : 'POST';
-        const res = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
-        const result = await res.json();
-        if (result.success) {
-            showToast(`Show "${data.name}" ${editingId ? 'updated' : 'created'}!`, 'success');
-            closeModal('showModal');
-            await loadShows();
-            if (editingId) selectShow(editingId);
-        } else {
-            alert(result.error || 'Failed to save show');
-        }
+        const wasEditing = editingId;
+        await withButtonLock('showSaveBtn', async () => {
+            const url = wasEditing ? `/api/shows/${wasEditing}` : '/api/shows';
+            const method = wasEditing ? 'PUT' : 'POST';
+            const result = await apiRequest(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+            if (result.success) {
+                showToast(`Show "${data.name}" ${wasEditing ? 'updated' : 'created'}!`, 'success');
+                closeModal('showModal');
+                await loadShows();
+                if (wasEditing) selectShow(wasEditing);
+            } else {
+                alert(result.error || 'Failed to save show. Please try again.');
+            }
+        });
     }
     async function deleteShow(id) {
         const password = prompt("Enter deletion password to confirm:");
@@ -1896,18 +1961,20 @@
     async function saveSequence() {
         const data = {name: document.getElementById('seqName').value, description: document.getElementById('seqDescription').value};
         if (!data.name) { alert('Sequence name is required'); return; }
-        const url = editingId ? `/api/sequences/${editingId}` : `/api/shows/${currentShowId}/sequences`;
-        const method = editingId ? 'PUT' : 'POST';
-        const res = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
-        const result = await res.json();
-        if (result.success) {
-            showToast(`Sequence "${data.name}" ${editingId ? 'updated' : 'added'}!`, 'success');
-            closeModal('sequenceModal');
-            await loadShowData();
-            loadSequences();
-        } else {
-            alert(result.error || 'Failed to save sequence');
-        }
+        const wasEditing = editingId;
+        await withButtonLock('seqSaveBtn', async () => {
+            const url = wasEditing ? `/api/sequences/${wasEditing}` : `/api/shows/${currentShowId}/sequences`;
+            const method = wasEditing ? 'PUT' : 'POST';
+            const result = await apiRequest(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+            if (result.success) {
+                showToast(`Sequence "${data.name}" ${wasEditing ? 'updated' : 'added'}!`, 'success');
+                closeModal('sequenceModal');
+                await loadShowData();
+                loadSequences();
+            } else {
+                alert(result.error || 'Failed to save sequence. Please try again.');
+            }
+        });
     }
     async function deleteSequence(id) {
         const password = prompt("Enter deletion password to confirm:");
@@ -1998,18 +2065,20 @@
             deadline: document.getElementById('shotDeadline').value
         };
         if (!data.name) { alert('Shot name is required'); return; }
-        const url = editingId ? `/api/shots/${editingId}` : `/api/shows/${currentShowId}/shots`;
-        const method = editingId ? 'PUT' : 'POST';
-        const res = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
-        const result = await res.json();
-        if (!result.success) {
-            alert(result.error || 'Failed to save shot');
-            return;
-        }
-        showToast(`Shot "${data.name}" ${editingId ? 'updated' : 'added'}!`, 'success');
-        closeModal('shotModal');
-        await loadShowData();
-        loadShots();
+        const wasEditing = editingId;
+        await withButtonLock('shotSaveBtn', async () => {
+            const url = wasEditing ? `/api/shots/${wasEditing}` : `/api/shows/${currentShowId}/shots`;
+            const method = wasEditing ? 'PUT' : 'POST';
+            const result = await apiRequest(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+            if (!result.success) {
+                alert(result.error || 'Failed to save shot. Please try again.');
+                return;
+            }
+            showToast(`Shot "${data.name}" ${wasEditing ? 'updated' : 'added'}!`, 'success');
+            closeModal('shotModal');
+            await loadShowData();
+            loadShots();
+        });
     }
     async function deleteShot(id) {
         const password = prompt("Enter deletion password to confirm:");
@@ -2084,28 +2153,22 @@
         };
         if (!data.pattern || !data.count) { alert('Pattern and count are required'); return; }
 
-        try {
-            const res = await fetch(`/api/shows/${currentShowId}/shots/bulk`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
-            const result = await res.json();
-            if (!result.success) {
-                alert(result.error || 'Failed to create shots');
-                return;
-            }
-
-            showToast(`Created ${result.created} shots successfully!`, 'success');
-            closeModal('bulkShotModal');
-
-            await loadShowData();
-            renderShotsBySequence();
-            updateBulkDeleteBar();
-
-        } catch (err) {
-            alert('Network error: ' + err.message);
+        const result = await apiRequest(`/api/shows/${currentShowId}/shots/bulk`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        if (!result.success) {
+            alert(result.error || 'Failed to create shots. Please try again.');
+            return;
         }
+
+        showToast(`Created ${result.created} shots successfully!`, 'success');
+        closeModal('bulkShotModal');
+
+        await loadShowData();
+        renderShotsBySequence();
+        updateBulkDeleteBar();
     }
 
     // ==================== ARTIST MODAL ====================
@@ -2143,18 +2206,20 @@
             rate: document.getElementById('artistRate').value
         };
         if (!data.name) { alert('Artist name is required'); return; }
-        const url = editingId ? `/api/artists/${editingId}` : `/api/shows/${currentShowId}/artists`;
-        const method = editingId ? 'PUT' : 'POST';
-        const res = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
-        const result = await res.json();
-        if (result.success) {
-            showToast(`Artist "${data.name}" ${editingId ? 'updated' : 'added'}!`, 'success');
-            closeModal('artistModal');
-            await loadShowData();
-            loadArtists();
-        } else {
-            alert(result.error || 'Failed to save artist');
-        }
+        const wasEditing = editingId;
+        await withButtonLock('artistSaveBtn', async () => {
+            const url = wasEditing ? `/api/artists/${wasEditing}` : `/api/shows/${currentShowId}/artists`;
+            const method = wasEditing ? 'PUT' : 'POST';
+            const result = await apiRequest(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+            if (result.success) {
+                showToast(`Artist "${data.name}" ${wasEditing ? 'updated' : 'added'}!`, 'success');
+                closeModal('artistModal');
+                await loadShowData();
+                loadArtists();
+            } else {
+                alert(result.error || 'Failed to save artist. Please try again.');
+            }
+        });
     }
     async function deleteArtist(id) {
         const password = prompt("Enter deletion password to confirm:");
